@@ -324,8 +324,8 @@ namespace Syntrix.Api
         /// <summary>
         /// API 2. Settings file in your mod's world storage folder (the folder ReadFileInWorldStorage uses
         /// for every type of your mod, so files written before stay valid).
-        /// Server: reads the file; if it is missing or empty, uses defaultText and writes it when
-        /// writeDefault is true. onText runs at once, then Syntrix hands the text to every player.
+        /// Server: reads the file; if it is missing or empty, uses defaultText, and writes it when the file is
+        /// missing and writeDefault is true. onText runs at once, then Syntrix hands the text to every player.
         /// Player: onText runs when the server's text arrives (after joining and after every SettingsSave).
         /// The text is yours to parse (XML, ini ...). Keep it below 50,000 characters.
         /// </summary>
@@ -335,11 +335,13 @@ namespace Syntrix.Api
                 return;
             if (MyAPIGateway.Session.IsServer)
             {
-                string text = SyntrixFiles.ReadWorld(file);
+                bool exists = SyntrixFiles.ExistsWorld(file);
+                string text = exists ? SyntrixFiles.ReadWorld(file) : null;
                 if (string.IsNullOrWhiteSpace(text))
                 {
                     text = defaultText ?? "";
-                    if (writeDefault && defaultText != null)
+                    // Only a missing file gets the default; an empty or unreadable one is left for the admin.
+                    if (writeDefault && !exists && defaultText != null)
                         SyntrixFiles.WriteWorld(file, defaultText);
                 }
                 _settings[file] = text;
@@ -528,10 +530,26 @@ namespace Syntrix.Api
         static readonly List<IMyTerminalControl> _controls = new List<IMyTerminalControl>();
         static readonly List<IMyTerminalAction> _actions = new List<IMyTerminalAction>();
         static bool _hooked, _created;
+        static Func<IMyTerminalBlock, bool> _listControlsFor, _listActionsFor;
 
         /// <summary>Any control; the factory runs once, when the controls are created.</summary>
         public static void AddControl(Func<IMyTerminalControl> factory) { _controlFactories.Add(factory); Hook(); }
         public static void AddAction(Func<IMyTerminalAction> factory) { _actionFactories.Add(factory); Hook(); }
+
+        /// <summary>
+        /// API 2. List mode: the controls and actions are not registered for TBlock with AddControl/AddAction.
+        /// Instead they are put into the terminal list (and action list) of every block for which controlsFor
+        /// (actionsFor) returns true, each time it is shown. Use it with a broad TBlock (e.g. IMyFunctionalBlock)
+        /// to give one set of controls to several block types; each control's visible check picks the blocks.
+        /// Call it before the first AddControl. Not on dedicated servers (no terminal there).
+        /// </summary>
+        public static void ListMode(Func<IMyTerminalBlock, bool> controlsFor, Func<IMyTerminalBlock, bool> actionsFor)
+        {
+            _listControlsFor = controlsFor;
+            _listActionsFor = actionsFor;
+        }
+
+        static bool InList { get { return _listControlsFor != null || _listActionsFor != null; } }
 
         /// <summary>API 2. True once the controls of this type exist.</summary>
         public static bool Created { get { return _created; } }
@@ -555,6 +573,8 @@ namespace Syntrix.Api
             }
             _hooked = false;
             _created = false;
+            _listControlsFor = null;
+            _listActionsFor = null;
             _controlFactories.Clear();
             _actionFactories.Clear();
             _controls.Clear();
@@ -570,14 +590,16 @@ namespace Syntrix.Api
             {
                 var c = f();
                 if (c == null) continue;
-                MyAPIGateway.TerminalControls.AddControl<TBlock>(c);
+                if (!InList)
+                    MyAPIGateway.TerminalControls.AddControl<TBlock>(c);
                 _controls.Add(c);
             }
             foreach (var f in _actionFactories)
             {
                 var a = f();
                 if (a == null) continue;
-                MyAPIGateway.TerminalControls.AddAction<TBlock>(a);
+                if (!InList)
+                    MyAPIGateway.TerminalControls.AddAction<TBlock>(a);
                 _actions.Add(a);
             }
         }
@@ -593,6 +615,15 @@ namespace Syntrix.Api
 
         static void ControlGetter(IMyTerminalBlock block, List<IMyTerminalControl> controls)
         {
+            if (InList)
+            {
+                if (_listControlsFor != null && block is TBlock && _listControlsFor(block))
+                {
+                    EnsureCreated();
+                    controls.AddRange(_controls);
+                }
+                return;
+            }
             if (_created || !(block is TBlock))
                 return;
             EnsureCreated();
@@ -602,6 +633,15 @@ namespace Syntrix.Api
 
         static void ActionGetter(IMyTerminalBlock block, List<IMyTerminalAction> actions)
         {
+            if (InList)
+            {
+                if (_listActionsFor != null && block is TBlock && _listActionsFor(block))
+                {
+                    EnsureCreated();
+                    actions.AddRange(_actions);
+                }
+                return;
+            }
             if (_created || !(block is TBlock))
                 return;
             EnsureCreated();
