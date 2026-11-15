@@ -1,0 +1,225 @@
+// Syntrix - shared services framework for Space Engineers mods.
+// MIT License, see LICENSE in the repository root.
+using System;
+using System.Collections.Generic;
+using System.Text;
+using Sandbox.ModAPI;
+using VRage;
+using VRage.Utils;
+
+namespace Syntrix
+{
+    /// <summary>
+    /// One secure channel for all docked mods. Payloads are byte[] that each mod
+    /// serializes itself (classes of other mods cannot cross assembly borders).
+    /// Player to player traffic is not offered; everything goes through the server.
+    /// </summary>
+    public class Network
+    {
+        public enum Target { Server, Player, All }
+
+        readonly SyntrixCore _core;
+        readonly Dictionary<string, Action<ulong, byte[]>> _channels = new Dictionary<string, Action<ulong, byte[]>>();
+        readonly Dictionary<string, string> _owner = new Dictionary<string, string>();
+
+        public Network(SyntrixCore core) { _core = core; }
+
+        public void Start() { MyAPIGateway.Multiplayer.RegisterSecureMessageHandler(Protocol.NetChannel, OnMessage); }
+
+        public void Stop()
+        {
+            MyAPIGateway.Multiplayer.UnregisterSecureMessageHandler(Protocol.NetChannel, OnMessage);
+            _channels.Clear();
+            _owner.Clear();
+        }
+
+        // ---------- mod channels ----------
+
+        public void RegisterChannel(string modName, string channel, Action<ulong, byte[]> handler)
+        {
+            if (string.IsNullOrEmpty(channel) || handler == null)
+                return;
+            string owner;
+            if (_owner.TryGetValue(channel, out owner) && owner != modName)
+            {
+                Log.Warn("Net channel '" + channel + "' of " + modName + " is already used by " + owner + ", ignored.");
+                return;
+            }
+            _owner[channel] = modName;
+            _channels[channel] = handler;
+        }
+
+        public void UnregisterChannel(string modName, string channel)
+        {
+            string owner;
+            if (channel != null && _owner.TryGetValue(channel, out owner) && owner == modName)
+            {
+                _owner.Remove(channel);
+                _channels.Remove(channel);
+            }
+        }
+
+        public void SendModData(string channel, byte[] data, ulong steamId, Target target)
+        {
+            if (string.IsNullOrEmpty(channel))
+                return;
+            var p = new Packet { Kind = PacketKind.ModData, Channel = channel, Data = data };
+            switch (target)
+            {
+                case Target.Server: ToServer(p); break;
+                case Target.Player: ToPlayer(p, steamId); break;
+                case Target.All: ToAll(p); break;
+            }
+        }
+
+        public void SendNotify(ulong steamId, string key, string fallback, string[] args, int ms, string font)
+        {
+            if (!_core.IsServer)
+            {
+                ShowNotify(key, fallback, args, ms, font); // client: only for itself
+                return;
+            }
+            var texts = new List<string> { key ?? "", fallback ?? "", font ?? "", ms.ToString() };
+            if (args != null)
+                texts.AddRange(args);
+            var p = new Packet { Kind = PacketKind.Notify, Texts = texts.ToArray() };
+            if (steamId == 0)
+                ToAll(p);
+            else
+                ToPlayer(p, steamId);
+        }
+
+        // ---------- sending ----------
+
+        public void ToServer(Packet p)
+        {
+            if (_core.IsServer)
+            {
+                Handle(p, MyAPIGateway.Multiplayer.MyId, true);
+                return;
+            }
+            MyAPIGateway.Multiplayer.SendMessageToServer(Protocol.NetChannel, MyAPIGateway.Utilities.SerializeToBinary(p), true);
+        }
+
+        public void ToPlayer(Packet p, ulong steamId)
+        {
+            if (!_core.IsServer)
+                return;
+            if (_core.IsPlayer && steamId == MyAPIGateway.Multiplayer.MyId)
+            {
+                Handle(p, steamId, true);
+                return;
+            }
+            MyAPIGateway.Multiplayer.SendMessageTo(Protocol.NetChannel, MyAPIGateway.Utilities.SerializeToBinary(p), steamId, true);
+        }
+
+        /// <summary>Server only: to every player, including a player on this machine.</summary>
+        public void ToAll(Packet p)
+        {
+            if (!_core.IsServer)
+                return;
+            if (MyAPIGateway.Multiplayer.MultiplayerActive)
+                MyAPIGateway.Multiplayer.SendMessageToOthers(Protocol.NetChannel, MyAPIGateway.Utilities.SerializeToBinary(p), true);
+            if (_core.IsPlayer)
+                Handle(p, MyAPIGateway.Multiplayer.MyId, true);
+        }
+
+        // ---------- receiving ----------
+
+        void OnMessage(ushort id, byte[] raw, ulong sender, bool fromServer)
+        {
+            try
+            {
+                if (raw == null || raw.Length > Protocol.MaxPacketBytes)
+                    return;
+                var p = MyAPIGateway.Utilities.SerializeFromBinary<Packet>(raw);
+                if (p != null)
+                    Handle(p, sender, fromServer);
+            }
+            catch (Exception e)
+            {
+                Log.Error("net message from " + sender, e);
+            }
+        }
+
+        void Handle(Packet p, ulong sender, bool fromServer)
+        {
+            bool toServer = p.Kind == PacketKind.BlockSet || p.Kind == PacketKind.BlockSyncRequest || p.Kind == PacketKind.ChatRun;
+            bool toPlayer = p.Kind == PacketKind.BlockValues || p.Kind == PacketKind.ChatReply || p.Kind == PacketKind.Notify;
+
+            if (toServer && !_core.IsServer)
+                return;
+            if (toPlayer && (!_core.IsPlayer || !fromServer))
+                return;
+
+            switch (p.Kind)
+            {
+                case PacketKind.ModData:
+                    // Players accept mod data only from the server; the server from anyone.
+                    if (!_core.IsServer && !fromServer)
+                        return;
+                    Action<ulong, byte[]> h;
+                    if (p.Channel != null && _channels.TryGetValue(p.Channel, out h))
+                    {
+                        try { h(sender, p.Data); }
+                        catch (Exception e) { Log.Error("net channel '" + p.Channel + "'", e); }
+                    }
+                    break;
+                case PacketKind.BlockSet:
+                case PacketKind.BlockSyncRequest:
+                case PacketKind.BlockValues:
+                    _core.Blocks.OnPacket(p, sender);
+                    break;
+                case PacketKind.ChatRun:
+                case PacketKind.ChatReply:
+                    _core.Chat.OnPacket(p, sender);
+                    break;
+                case PacketKind.Notify:
+                    if (p.Texts != null && p.Texts.Length >= 4)
+                    {
+                        int ms;
+                        int.TryParse(p.Texts[3], out ms);
+                        var args = new string[p.Texts.Length - 4];
+                        Array.Copy(p.Texts, 4, args, 0, args.Length);
+                        ShowNotify(p.Texts[0], p.Texts[1], args, ms, p.Texts[2]);
+                    }
+                    break;
+            }
+        }
+
+        // ---------- localized notifications ----------
+
+        public static string Resolve(string key, string fallback)
+        {
+            if (!string.IsNullOrEmpty(key))
+            {
+                var id = MyStringId.GetOrCompute(key);
+                if (MyTexts.Exists(id))
+                    return MyTexts.GetString(id);
+            }
+            return fallback ?? key ?? "";
+        }
+
+        public static string Compose(string key, string fallback, string[] args)
+        {
+            string text = Resolve(key, fallback);
+            if (args == null || args.Length == 0)
+                return text;
+            var resolved = new object[args.Length];
+            for (int i = 0; i < args.Length; i++)
+            {
+                string a = args[i] ?? "";
+                resolved[i] = a.Length > 1 && a[0] == Protocol.TextArgPrefix ? Resolve(a.Substring(1), a.Substring(1)) : a;
+            }
+            try { return string.Format(text, resolved); }
+            catch (FormatException) { return text + " " + string.Join(" ", args); }
+        }
+
+        static void ShowNotify(string key, string fallback, string[] args, int ms, string font)
+        {
+            if (MyAPIGateway.Utilities.IsDedicated)
+                return;
+            MyAPIGateway.Utilities.ShowNotification(Compose(key, fallback, args), ms > 0 ? ms : 3000, string.IsNullOrEmpty(font) ? "White" : font);
+        }
+    }
+}

@@ -1,0 +1,258 @@
+// Syntrix - shared services framework for Space Engineers mods.
+// MIT License, see LICENSE in the repository root.
+using System;
+using System.Collections.Generic;
+using Sandbox.ModAPI;
+using VRage;
+using VRage.Game;
+using VRage.Game.Components;
+using VRage.Game.ModAPI;
+using VRage.Utils;
+using VRageMath;
+
+namespace Syntrix
+{
+    /// <summary>
+    /// Entry point. Negotiates between several installed copies (highest version wins),
+    /// starts the services and hands every docking mod its own endpoint dictionary.
+    /// </summary>
+    [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate, int.MinValue + 100)]
+    public class SyntrixCore : MySessionComponentBase
+    {
+        public static SyntrixCore Instance;
+
+        public bool Active { get; private set; }
+        public bool Started { get; private set; }
+        public bool IsServer { get; private set; }
+        public bool IsPlayer { get; private set; }
+
+        public Network Net;
+        public BlockStore Blocks;
+        public ChatCommands Chat;
+        public EventBus Events;
+
+        readonly Dictionary<string, int> _docked = new Dictionary<string, int>();
+        string _instanceKey;
+
+        public IEnumerable<KeyValuePair<string, int>> DockedMods { get { return _docked; } }
+
+        public override void LoadData()
+        {
+            Instance = this;
+            Active = true;
+            IsServer = MyAPIGateway.Session.IsServer;
+            IsPlayer = !MyAPIGateway.Utilities.IsDedicated;
+            _instanceKey = (ModContext != null ? ModContext.ModId : "") ?? "";
+
+            MyAPIGateway.Utilities.RegisterMessageHandler(Protocol.ApiChannel, OnModMessage);
+            // Announce ourselves; an older copy that hears this steps down, a newer one answers.
+            MyAPIGateway.Utilities.SendModMessage(Protocol.ApiChannel,
+                new MyTuple<string, int, string, Action<int, string>>(Protocol.TagInstance, Protocol.ApiVersion, _instanceKey, OnInstanceReply));
+        }
+
+        public override void BeforeStart()
+        {
+            if (!Active)
+                return;
+
+            Events = new EventBus();
+            Net = new Network(this);
+            Blocks = new BlockStore(this);
+            Chat = new ChatCommands(this);
+            Net.Start();
+            Blocks.Start();
+            Chat.Start();
+            Started = true;
+
+            Log.Info("Syntrix " + Protocol.VersionText + " (API " + Protocol.ApiVersion + ") started, " + (IsServer ? "server" : "client") + (IsPlayer ? " with player" : ""));
+            MyAPIGateway.Utilities.SendModMessage(Protocol.ApiChannel, new MyTuple<string, int>(Protocol.TagHello, Protocol.ApiVersion));
+        }
+
+        protected override void UnloadData()
+        {
+            MyAPIGateway.Utilities.UnregisterMessageHandler(Protocol.ApiChannel, OnModMessage);
+            if (Started)
+            {
+                MyAPIGateway.Utilities.SendModMessage(Protocol.ApiChannel, new MyTuple<string, int>(Protocol.TagBye, Protocol.ApiVersion));
+                Chat.Stop();
+                Blocks.Stop();
+                Net.Stop();
+            }
+            Started = false;
+            Active = false;
+            if (Instance == this)
+                Instance = null;
+        }
+
+        // ---------- copies of the framework ----------
+
+        bool OtherWins(int version, string key)
+        {
+            if (version != Protocol.ApiVersion)
+                return version > Protocol.ApiVersion;
+            return string.CompareOrdinal(key, _instanceKey) < 0;
+        }
+
+        void OnInstanceReply(int version, string key)
+        {
+            if (key == _instanceKey || !Active)
+                return;
+            if (OtherWins(version, key))
+                StepDown(key);
+        }
+
+        void StepDown(string winner)
+        {
+            if (!Active)
+                return;
+            Active = false;
+            Log.Info("Another Syntrix copy (" + winner + ") is newer or preferred, this copy (" + _instanceKey + ") stays inactive.");
+        }
+
+        // ---------- docking ----------
+
+        void OnModMessage(object msg)
+        {
+            try
+            {
+                if (msg is MyTuple<string, int, string, Action<int, string>>)
+                {
+                    var m = (MyTuple<string, int, string, Action<int, string>>)msg;
+                    if (m.Item1 != Protocol.TagInstance || m.Item3 == _instanceKey)
+                        return;
+                    if (m.Item4 != null)
+                        m.Item4(Protocol.ApiVersion, _instanceKey);
+                    if (OtherWins(m.Item2, m.Item3))
+                        StepDown(m.Item3);
+                    return;
+                }
+
+                if (msg is MyTuple<string, int, string, Action<object>>)
+                {
+                    var r = (MyTuple<string, int, string, Action<object>>)msg;
+                    if (r.Item1 == Protocol.TagRegister && r.Item4 != null && Active && Started)
+                        Register(r.Item3, r.Item2, r.Item4);
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error("mod message", e);
+            }
+        }
+
+        void Register(string modName, int apiVersion, Action<object> reply)
+        {
+            if (string.IsNullOrWhiteSpace(modName))
+            {
+                reply("Syntrix: registration without mod name rejected.");
+                return;
+            }
+            if (apiVersion < Protocol.MinApiVersion)
+            {
+                string text = "Syntrix " + Protocol.VersionText + ": " + modName + " uses dock file version " + apiVersion
+                    + ", oldest supported is " + Protocol.MinApiVersion + ". Update the dock file of that mod.";
+                Log.Warn(text);
+                reply(text);
+                return;
+            }
+
+            bool again = _docked.ContainsKey(modName);
+            _docked[modName] = apiVersion;
+            if (!again)
+                Log.Info("Docked: " + modName + " (dock file version " + apiVersion + ")");
+            reply(new MyTuple<int, string, IReadOnlyDictionary<string, Delegate>>(Protocol.ApiVersion, Protocol.VersionText, Endpoints(modName)));
+        }
+
+        /// <summary>Endpoint dictionary for one mod. Keys are never removed or changed in meaning.</summary>
+        IReadOnlyDictionary<string, Delegate> Endpoints(string modName)
+        {
+            var d = new Dictionary<string, Delegate>();
+
+            d["Info.IsServer"] = new Func<bool>(() => IsServer);
+            d["Info.IsPlayer"] = new Func<bool>(() => IsPlayer);
+            d["Info.PromoteLevel"] = new Func<ulong, int>(steamId => (int)PromoteLevel(steamId));
+
+            d["Net.Register"] = new Action<string, Action<ulong, byte[]>>((ch, h) => Net.RegisterChannel(modName, ch, h));
+            d["Net.Unregister"] = new Action<string>(ch => Net.UnregisterChannel(modName, ch));
+            d["Net.SendToServer"] = new Action<string, byte[]>((ch, data) => Net.SendModData(ch, data, 0, Network.Target.Server));
+            d["Net.SendToPlayer"] = new Action<string, ulong, byte[]>((ch, id, data) => Net.SendModData(ch, data, id, Network.Target.Player));
+            d["Net.SendToAll"] = new Action<string, byte[]>((ch, data) => Net.SendModData(ch, data, 0, Network.Target.All));
+
+            d["Block.Get"] = new Func<long, string, string, string>((id, mod, key) => Blocks.Get(id, mod, key));
+            d["Block.Set"] = new Action<long, string, string, string>((id, mod, key, value) => Blocks.Set(id, mod, key, value));
+            d["Block.OnChanged"] = new Action<string, Action<long, string, string>>((mod, h) => Blocks.Subscribe(mod, h));
+            d["Block.RemoveOnChanged"] = new Action<string, Action<long, string, string>>((mod, h) => Blocks.Unsubscribe(mod, h));
+            d["Block.RequestSync"] = new Action<long>(id => Blocks.RequestSync(id));
+
+            d["Chat.Register"] = new Action<string, int, bool, string, Func<ulong, string[], string>>((cmd, level, onServer, help, h) => Chat.Register(modName, cmd, level, onServer, help, h));
+
+            d["Events.Subscribe"] = new Action<string, Action<object>>((name, h) => Events.Subscribe(name, h));
+            d["Events.Unsubscribe"] = new Action<string, Action<object>>((name, h) => Events.Unsubscribe(name, h));
+            d["Events.Publish"] = new Action<string, object>((name, payload) => Events.Publish(name, payload));
+
+            d["Notify.Player"] = new Action<ulong, string, string, string[], int, string>((id, key, fallback, args, ms, font) => Net.SendNotify(id, key, fallback, args, ms, font));
+
+            return d;
+        }
+
+        public MyPromoteLevel PromoteLevel(ulong steamId)
+        {
+            if (!MyAPIGateway.Multiplayer.MultiplayerActive || steamId == MyAPIGateway.Multiplayer.MyId)
+                return IsPlayer ? MyAPIGateway.Session.PromoteLevel : MyPromoteLevel.Owner;
+            IMyPlayer p = FindPlayer(steamId);
+            return p != null ? p.PromoteLevel : MyPromoteLevel.None;
+        }
+
+        readonly List<IMyPlayer> _players = new List<IMyPlayer>();
+
+        public IMyPlayer FindPlayer(ulong steamId)
+        {
+            _players.Clear();
+            MyAPIGateway.Players.GetPlayers(_players, p => p.SteamUserId == steamId);
+            return _players.Count > 0 ? _players[0] : null;
+        }
+    }
+
+    /// <summary>Local publish/subscribe between mods (same machine only).</summary>
+    public class EventBus
+    {
+        readonly Dictionary<string, List<Action<object>>> _subs = new Dictionary<string, List<Action<object>>>();
+
+        public void Subscribe(string name, Action<object> handler)
+        {
+            if (string.IsNullOrEmpty(name) || handler == null)
+                return;
+            List<Action<object>> list;
+            if (!_subs.TryGetValue(name, out list))
+                _subs[name] = list = new List<Action<object>>();
+            if (!list.Contains(handler))
+                list.Add(handler);
+        }
+
+        public void Unsubscribe(string name, Action<object> handler)
+        {
+            List<Action<object>> list;
+            if (name != null && _subs.TryGetValue(name, out list))
+                list.Remove(handler);
+        }
+
+        public void Publish(string name, object payload)
+        {
+            List<Action<object>> list;
+            if (name == null || !_subs.TryGetValue(name, out list) || list.Count == 0)
+                return;
+            foreach (var h in list.ToArray())
+            {
+                try { h(payload); }
+                catch (Exception e) { Log.Error("event '" + name + "'", e); }
+            }
+        }
+    }
+
+    public static class Log
+    {
+        public static void Info(string text) { MyLog.Default.WriteLineAndConsole("Syntrix: " + text); }
+        public static void Warn(string text) { MyLog.Default.WriteLineAndConsole("Syntrix: WARNING " + text); }
+        public static void Error(string where, Exception e) { MyLog.Default.WriteLineAndConsole("Syntrix: ERROR in " + where + ": " + e); }
+    }
+}
