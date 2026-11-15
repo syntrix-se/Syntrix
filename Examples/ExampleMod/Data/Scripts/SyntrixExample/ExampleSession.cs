@@ -1,6 +1,5 @@
 // Smallest mod that docks to Syntrix. Copy Api/SyntrixApi.cs next to this file.
 // MIT License, see LICENSE in the Syntrix repository.
-using System.Text;
 using Sandbox.ModAPI;
 using Syntrix.Api;
 using VRage.Game;
@@ -13,8 +12,12 @@ namespace SyntrixExample
     public class ExampleSession : MySessionComponentBase
     {
         const string Mod = "SyntrixExample";
+        const string SettingsFile = "SyntrixExample.ini";
+        const string EventWatched = "SyntrixExample.DoorWatched";
+
         readonly SyntrixApi _syx = new SyntrixApi();
         readonly SyntrixLog _log = new SyntrixLog(Mod);
+        string _greeting = "Hello";
 
         public override void LoadData()
         {
@@ -24,6 +27,28 @@ namespace SyntrixExample
             SyntrixControls<IMyDoor>.Checkbox(_syx, "SyntrixExample_Watch", "SyntrixExample_Watch", "SyntrixExample_Watch_Tooltip",
                 Mod, "watch", false);
             SyntrixControls<IMyDoor>.TextBox(_syx, "SyntrixExample_Note", "SyntrixExample_Note", null, Mod, "note");
+
+            // Settings: the server reads SyntrixExample.ini from the world (or writes the default),
+            // every player gets the same text. Registrations like this one may come before onReady.
+            _syx.SettingsLoad(SettingsFile, "greeting=Hello\n", true, ParseSettings);
+
+            // An event sent by the server: payload is string[]; EventSender tells who sent it.
+            _syx.Subscribe(EventWatched, payload =>
+            {
+                var args = payload as string[];
+                if (args != null && args.Length == 2 && _syx.IsPlayer)
+                    MyAPIGateway.Utilities.ShowMessage(Mod, "Door " + args[0] + " watched: " + args[1]);
+            });
+        }
+
+        void ParseSettings(string text)
+        {
+            foreach (var line in text.Split('\n'))
+            {
+                var parts = line.Split(new[] { '=' }, 2);
+                if (parts.Length == 2 && parts[0].Trim() == "greeting")
+                    _greeting = parts[1].Trim();
+            }
         }
 
         void OnReady()
@@ -36,8 +61,11 @@ namespace SyntrixExample
                 if (!_syx.IsServer || key != "watch")
                     return;
                 var door = MyAPIGateway.Entities.GetEntityById(entityId) as IMyDoor;
-                if (door != null)
-                    _syx.Notify(0, "SyntrixExample_Changed", "Door {0}: watch {1}", new[] { door.CustomName, value });
+                if (door == null)
+                    return;
+                _syx.Notify(0, "SyntrixExample_Changed", "Door {0}: watch {1}", new[] { door.CustomName, value });
+                // To subscribers of this event on the server and on every player.
+                _syx.SendEventToAll(EventWatched, door.CustomName, value);
             });
 
             // Chat command handled on the server.
@@ -54,7 +82,7 @@ namespace SyntrixExample
                             n++;
                     return false;
                 });
-                return "Watched doors: " + n;
+                return _greeting + "! Watched doors: " + n;
             });
 
             // Raw network channel: the server answers every ping with a pong.

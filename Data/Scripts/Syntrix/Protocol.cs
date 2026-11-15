@@ -14,13 +14,13 @@ namespace Syntrix
         public const ushort NetChannel = 52741;
 
         /// <summary>API version this framework build offers.</summary>
-        public const int ApiVersion = 1;
+        public const int ApiVersion = 2;
 
         /// <summary>Oldest dock file version this build still accepts.</summary>
         public const int MinApiVersion = 1;
 
         /// <summary>Human readable version (semantic versioning).</summary>
-        public const string VersionText = "1.0.0";
+        public const string VersionText = "1.1.0";
 
         public const string TagRegister = "syx.register";
         public const string TagHello = "syx.hello";
@@ -34,6 +34,8 @@ namespace Syntrix
         public const int MaxValueLength = 4096;
         public const int MaxValuesPerBlock = 256;
         public const int MaxPacketBytes = 60000;
+        public const int MaxEventArgs = 64;
+        public const int MaxSettingsLength = 50000;
     }
 
     public enum PacketKind : byte
@@ -45,6 +47,10 @@ namespace Syntrix
         ChatRun = 5,
         ChatReply = 6,
         Notify = 7,
+        // API 2
+        Event = 8,
+        SettingsValue = 9,
+        SettingsRequest = 10,
     }
 
     [ProtoContract]

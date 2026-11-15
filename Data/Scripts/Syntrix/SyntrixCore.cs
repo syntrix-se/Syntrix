@@ -30,6 +30,7 @@ namespace Syntrix
         public BlockStore Blocks;
         public ChatCommands Chat;
         public EventBus Events;
+        public SettingsService Settings;
 
         readonly Dictionary<string, int> _docked = new Dictionary<string, int>();
         string _instanceKey;
@@ -55,13 +56,15 @@ namespace Syntrix
             if (!Active)
                 return;
 
-            Events = new EventBus();
+            Events = new EventBus(this);
             Net = new Network(this);
             Blocks = new BlockStore(this);
             Chat = new ChatCommands(this);
+            Settings = new SettingsService(this);
             Net.Start();
             Blocks.Start();
             Chat.Start();
+            Settings.Start();
             Started = true;
 
             Log.Info("Syntrix " + Protocol.VersionText + " (API " + Protocol.ApiVersion + ") started, " + (IsServer ? "server" : "client") + (IsPlayer ? " with player" : ""));
@@ -74,6 +77,8 @@ namespace Syntrix
             if (Started)
             {
                 MyAPIGateway.Utilities.SendModMessage(Protocol.ApiChannel, new MyTuple<string, int>(Protocol.TagBye, Protocol.ApiVersion));
+                Settings.Stop();
+                Events.Stop();
                 Chat.Stop();
                 Blocks.Stop();
                 Net.Stop();
@@ -190,6 +195,15 @@ namespace Syntrix
             d["Events.Unsubscribe"] = new Action<string, Action<object>>((name, h) => Events.Unsubscribe(name, h));
             d["Events.Publish"] = new Action<string, object>((name, payload) => Events.Publish(name, payload));
 
+            // API 2
+            d["Chat.Unregister"] = new Action<string>(cmd => Chat.Unregister(modName, cmd));
+            d["Events.SendToServer"] = new Action<string, string[]>((name, args) => Events.SendToServer(name, args));
+            d["Events.SendToAll"] = new Action<string, string[]>((name, args) => Events.SendToAll(name, args));
+            d["Events.SendToPlayer"] = new Action<string, ulong, string[]>((name, id, args) => Events.SendToPlayer(name, id, args));
+            d["Events.Sender"] = new Func<ulong>(() => Events.Sender);
+            d["Settings.Publish"] = new Action<string, string>((file, text) => Settings.Publish(modName, file, text));
+            d["Settings.Subscribe"] = new Action<string, Action<string>>((file, h) => Settings.Subscribe(modName, file, h));
+
             d["Notify.Player"] = new Action<ulong, string, string, string[], int, string>((id, key, fallback, args, ms, font) => Net.SendNotify(id, key, fallback, args, ms, font));
 
             return d;
@@ -210,42 +224,6 @@ namespace Syntrix
             _players.Clear();
             MyAPIGateway.Players.GetPlayers(_players, p => p.SteamUserId == steamId);
             return _players.Count > 0 ? _players[0] : null;
-        }
-    }
-
-    /// <summary>Local publish/subscribe between mods (same machine only).</summary>
-    public class EventBus
-    {
-        readonly Dictionary<string, List<Action<object>>> _subs = new Dictionary<string, List<Action<object>>>();
-
-        public void Subscribe(string name, Action<object> handler)
-        {
-            if (string.IsNullOrEmpty(name) || handler == null)
-                return;
-            List<Action<object>> list;
-            if (!_subs.TryGetValue(name, out list))
-                _subs[name] = list = new List<Action<object>>();
-            if (!list.Contains(handler))
-                list.Add(handler);
-        }
-
-        public void Unsubscribe(string name, Action<object> handler)
-        {
-            List<Action<object>> list;
-            if (name != null && _subs.TryGetValue(name, out list))
-                list.Remove(handler);
-        }
-
-        public void Publish(string name, object payload)
-        {
-            List<Action<object>> list;
-            if (name == null || !_subs.TryGetValue(name, out list) || list.Count == 0)
-                return;
-            foreach (var h in list.ToArray())
-            {
-                try { h(payload); }
-                catch (Exception e) { Log.Error("event '" + name + "'", e); }
-            }
         }
     }
 

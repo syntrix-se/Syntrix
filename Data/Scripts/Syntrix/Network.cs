@@ -113,6 +113,25 @@ namespace Syntrix
             MyAPIGateway.Multiplayer.SendMessageTo(Protocol.NetChannel, MyAPIGateway.Utilities.SerializeToBinary(p), steamId, true);
         }
 
+        // Without local delivery (API 2 services decide themselves what happens on this machine).
+        public void RawToServer(Packet p)
+        {
+            if (!_core.IsServer)
+                MyAPIGateway.Multiplayer.SendMessageToServer(Protocol.NetChannel, MyAPIGateway.Utilities.SerializeToBinary(p), true);
+        }
+
+        public void RawToOthers(Packet p)
+        {
+            if (_core.IsServer && MyAPIGateway.Multiplayer.MultiplayerActive)
+                MyAPIGateway.Multiplayer.SendMessageToOthers(Protocol.NetChannel, MyAPIGateway.Utilities.SerializeToBinary(p), true);
+        }
+
+        public void RawToPlayer(Packet p, ulong steamId)
+        {
+            if (_core.IsServer && steamId != MyAPIGateway.Multiplayer.MyId)
+                MyAPIGateway.Multiplayer.SendMessageTo(Protocol.NetChannel, MyAPIGateway.Utilities.SerializeToBinary(p), steamId, true);
+        }
+
         /// <summary>Server only: to every player, including a player on this machine.</summary>
         public void ToAll(Packet p)
         {
@@ -130,7 +149,8 @@ namespace Syntrix
         {
             try
             {
-                if (raw == null || raw.Length > Protocol.MaxPacketBytes)
+                // Players are limited; the server may send larger settings texts.
+                if (raw == null || (!fromServer && raw.Length > Protocol.MaxPacketBytes))
                     return;
                 var p = MyAPIGateway.Utilities.SerializeFromBinary<Packet>(raw);
                 if (p != null)
@@ -144,8 +164,10 @@ namespace Syntrix
 
         void Handle(Packet p, ulong sender, bool fromServer)
         {
-            bool toServer = p.Kind == PacketKind.BlockSet || p.Kind == PacketKind.BlockSyncRequest || p.Kind == PacketKind.ChatRun;
-            bool toPlayer = p.Kind == PacketKind.BlockValues || p.Kind == PacketKind.ChatReply || p.Kind == PacketKind.Notify;
+            bool toServer = p.Kind == PacketKind.BlockSet || p.Kind == PacketKind.BlockSyncRequest || p.Kind == PacketKind.ChatRun
+                || p.Kind == PacketKind.SettingsRequest;
+            bool toPlayer = p.Kind == PacketKind.BlockValues || p.Kind == PacketKind.ChatReply || p.Kind == PacketKind.Notify
+                || p.Kind == PacketKind.SettingsValue;
 
             if (toServer && !_core.IsServer)
                 return;
@@ -173,6 +195,13 @@ namespace Syntrix
                 case PacketKind.ChatRun:
                 case PacketKind.ChatReply:
                     _core.Chat.OnPacket(p, sender);
+                    break;
+                case PacketKind.Event:
+                    _core.Events.OnPacket(p, sender, fromServer);
+                    break;
+                case PacketKind.SettingsRequest:
+                case PacketKind.SettingsValue:
+                    _core.Settings.OnPacket(p, sender, fromServer);
                     break;
                 case PacketKind.Notify:
                     if (p.Texts != null && p.Texts.Length >= 4)

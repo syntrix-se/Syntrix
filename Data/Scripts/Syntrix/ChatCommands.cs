@@ -64,6 +64,17 @@ namespace Syntrix
             };
         }
 
+        /// <summary>API 2: removes a command, only by the mod that registered it.</summary>
+        public void Unregister(string mod, string command)
+        {
+            if (string.IsNullOrWhiteSpace(command))
+                return;
+            command = command.Trim().TrimStart('/');
+            Entry e;
+            if (_commands.TryGetValue(command, out e) && e.Mod == mod)
+                _commands.Remove(command);
+        }
+
         void OnMessageEntered(ulong sender, string text, ref bool sendToOthers)
         {
             if (string.IsNullOrEmpty(text) || text[0] != '/')
