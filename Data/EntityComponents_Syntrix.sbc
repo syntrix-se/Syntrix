@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <EntityComponents>
+    <!-- Syntrix block settings (BlockStore.StorageGuid). Never change this GUID. -->
+    <EntityComponent xsi:type="MyObjectBuilder_ModStorageComponentDefinition">
+      <Id>
+        <TypeId>ModStorageComponent</TypeId>
+        <SubtypeId>Syntrix</SubtypeId>
+      </Id>
+      <RegisteredStorageGuids>
+        <guid>583FC123-E62D-4269-A84C-14B32976D720</guid>
+      </RegisteredStorageGuids>
+    </EntityComponent>
+  </EntityComponents>
+</Definitions>
