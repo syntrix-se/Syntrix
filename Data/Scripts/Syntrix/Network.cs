@@ -16,16 +16,28 @@ namespace Syntrix
     /// </summary>
     public class Network
     {
-        public enum Target { Server, Player, All }
+        /// <summary>Receiver of raw mod data.</summary>
+        public enum Target
+        {
+            /// <summary>The server.</summary>
+            Server,
+            /// <summary>One player.</summary>
+            Player,
+            /// <summary>Server and all players.</summary>
+            All,
+        }
 
-        readonly SyntrixCore _core;
-        readonly Dictionary<string, Action<ulong, byte[]>> _channels = new Dictionary<string, Action<ulong, byte[]>>();
-        readonly Dictionary<string, string> _owner = new Dictionary<string, string>();
+        private readonly SyntrixCore _core;
+        private readonly Dictionary<string, Action<ulong, byte[]>> _channels = new Dictionary<string, Action<ulong, byte[]>>();
+        private readonly Dictionary<string, string> _owner = new Dictionary<string, string>();
 
+        /// <summary>Makes the network service.</summary>
         public Network(SyntrixCore core) { _core = core; }
 
+        /// <summary>Registers the secure message handler.</summary>
         public void Start() { MyAPIGateway.Multiplayer.RegisterSecureMessageHandler(Protocol.NetChannel, OnMessage); }
 
+        /// <summary>Unregisters the handler and forgets all channels.</summary>
         public void Stop()
         {
             MyAPIGateway.Multiplayer.UnregisterSecureMessageHandler(Protocol.NetChannel, OnMessage);
@@ -35,6 +47,7 @@ namespace Syntrix
 
         // ---------- mod channels ----------
 
+        /// <summary>Handler for a raw data channel of a mod.</summary>
         public void RegisterChannel(string modName, string channel, Action<ulong, byte[]> handler)
         {
             if (string.IsNullOrEmpty(channel) || handler == null)
@@ -49,6 +62,7 @@ namespace Syntrix
             _channels[channel] = handler;
         }
 
+        /// <summary>Removes a raw data channel.</summary>
         public void UnregisterChannel(string modName, string channel)
         {
             string owner;
@@ -59,6 +73,7 @@ namespace Syntrix
             }
         }
 
+        /// <summary>Sends raw data of a mod channel.</summary>
         public void SendModData(string channel, byte[] data, ulong steamId, Target target)
         {
             if (string.IsNullOrEmpty(channel))
@@ -72,6 +87,7 @@ namespace Syntrix
             }
         }
 
+        /// <summary>Shows a notification: from the server on a player (0 = all players), on a client only there.</summary>
         public void SendNotify(ulong steamId, string key, string fallback, string[] args, int ms, string font)
         {
             if (!_core.IsServer)
@@ -91,6 +107,7 @@ namespace Syntrix
 
         // ---------- sending ----------
 
+        /// <summary>Sends a packet to the server (handled directly on the server itself).</summary>
         public void ToServer(Packet p)
         {
             if (_core.IsServer)
@@ -101,6 +118,7 @@ namespace Syntrix
             MyAPIGateway.Multiplayer.SendMessageToServer(Protocol.NetChannel, MyAPIGateway.Utilities.SerializeToBinary(p), true);
         }
 
+        /// <summary>Sends a packet to a player (handled directly when it is this machine).</summary>
         public void ToPlayer(Packet p, ulong steamId)
         {
             if (!_core.IsServer)
@@ -111,6 +129,28 @@ namespace Syntrix
                 return;
             }
             MyAPIGateway.Multiplayer.SendMessageTo(Protocol.NetChannel, MyAPIGateway.Utilities.SerializeToBinary(p), steamId, true);
+        }
+
+        // Without local delivery (API 2 services decide themselves what happens on this machine).
+        /// <summary>Sends a packet to the server over the network.</summary>
+        public void RawToServer(Packet p)
+        {
+            if (!_core.IsServer)
+                MyAPIGateway.Multiplayer.SendMessageToServer(Protocol.NetChannel, MyAPIGateway.Utilities.SerializeToBinary(p), true);
+        }
+
+        /// <summary>Sends a packet to all other machines.</summary>
+        public void RawToOthers(Packet p)
+        {
+            if (_core.IsServer && MyAPIGateway.Multiplayer.MultiplayerActive)
+                MyAPIGateway.Multiplayer.SendMessageToOthers(Protocol.NetChannel, MyAPIGateway.Utilities.SerializeToBinary(p), true);
+        }
+
+        /// <summary>Sends a packet to one player over the network.</summary>
+        public void RawToPlayer(Packet p, ulong steamId)
+        {
+            if (_core.IsServer && steamId != MyAPIGateway.Multiplayer.MyId)
+                MyAPIGateway.Multiplayer.SendMessageTo(Protocol.NetChannel, MyAPIGateway.Utilities.SerializeToBinary(p), steamId, true);
         }
 
         /// <summary>Server only: to every player, including a player on this machine.</summary>
@@ -126,11 +166,12 @@ namespace Syntrix
 
         // ---------- receiving ----------
 
-        void OnMessage(ushort id, byte[] raw, ulong sender, bool fromServer)
+        private void OnMessage(ushort id, byte[] raw, ulong sender, bool fromServer)
         {
             try
             {
-                if (raw == null || raw.Length > Protocol.MaxPacketBytes)
+                // Players are limited; the server may send larger settings texts.
+                if (raw == null || (!fromServer && raw.Length > Protocol.MaxPacketBytes))
                     return;
                 var p = MyAPIGateway.Utilities.SerializeFromBinary<Packet>(raw);
                 if (p != null)
@@ -142,10 +183,12 @@ namespace Syntrix
             }
         }
 
-        void Handle(Packet p, ulong sender, bool fromServer)
+        private void Handle(Packet p, ulong sender, bool fromServer)
         {
-            bool toServer = p.Kind == PacketKind.BlockSet || p.Kind == PacketKind.BlockSyncRequest || p.Kind == PacketKind.ChatRun;
-            bool toPlayer = p.Kind == PacketKind.BlockValues || p.Kind == PacketKind.ChatReply || p.Kind == PacketKind.Notify;
+            bool toServer = p.Kind == PacketKind.BlockSet || p.Kind == PacketKind.BlockSyncRequest || p.Kind == PacketKind.ChatRun
+                || p.Kind == PacketKind.SettingsRequest;
+            bool toPlayer = p.Kind == PacketKind.BlockValues || p.Kind == PacketKind.ChatReply || p.Kind == PacketKind.Notify
+                || p.Kind == PacketKind.SettingsValue;
 
             if (toServer && !_core.IsServer)
                 return;
@@ -174,6 +217,13 @@ namespace Syntrix
                 case PacketKind.ChatReply:
                     _core.Chat.OnPacket(p, sender);
                     break;
+                case PacketKind.Event:
+                    _core.Events.OnPacket(p, sender, fromServer);
+                    break;
+                case PacketKind.SettingsRequest:
+                case PacketKind.SettingsValue:
+                    _core.Settings.OnPacket(p, sender, fromServer);
+                    break;
                 case PacketKind.Notify:
                     if (p.Texts != null && p.Texts.Length >= 4)
                     {
@@ -189,6 +239,7 @@ namespace Syntrix
 
         // ---------- localized notifications ----------
 
+        /// <summary>Text of a key in the game language, or the fallback.</summary>
         public static string Resolve(string key, string fallback)
         {
             if (!string.IsNullOrEmpty(key))
@@ -200,6 +251,7 @@ namespace Syntrix
             return fallback ?? key ?? "";
         }
 
+        /// <summary>Formats a text key with arguments (arguments may be text keys themselves).</summary>
         public static string Compose(string key, string fallback, string[] args)
         {
             string text = Resolve(key, fallback);
@@ -215,7 +267,7 @@ namespace Syntrix
             catch (FormatException) { return text + " " + string.Join(" ", args); }
         }
 
-        static void ShowNotify(string key, string fallback, string[] args, int ms, string font)
+        private static void ShowNotify(string key, string fallback, string[] args, int ms, string font)
         {
             if (MyAPIGateway.Utilities.IsDedicated)
                 return;

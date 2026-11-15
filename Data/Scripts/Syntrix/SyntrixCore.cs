@@ -7,6 +7,7 @@ using VRage;
 using VRage.Game;
 using VRage.Game.Components;
 using VRage.Game.ModAPI;
+using Syntrix.Ui;
 using VRage.Utils;
 using VRageMath;
 
@@ -19,23 +20,38 @@ namespace Syntrix
     [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate, int.MinValue + 100)]
     public class SyntrixCore : MySessionComponentBase
     {
+        /// <summary>The running session component.</summary>
         public static SyntrixCore Instance;
 
+        /// <summary>This copy is the active Syntrix (highest version).</summary>
         public bool Active { get; private set; }
+        /// <summary>The services are running.</summary>
         public bool Started { get; private set; }
+        /// <summary>Runs on the server (or single player).</summary>
         public bool IsServer { get; private set; }
+        /// <summary>Has a local player (not a dedicated server).</summary>
         public bool IsPlayer { get; private set; }
 
+        /// <summary>Network service.</summary>
         public Network Net;
+        /// <summary>Block settings service.</summary>
         public BlockStore Blocks;
+        /// <summary>Chat command service.</summary>
         public ChatCommands Chat;
+        /// <summary>Event service.</summary>
         public EventBus Events;
+        /// <summary>Settings service.</summary>
+        public SettingsService Settings;
+        /// <summary>UI service.</summary>
+        public UiService Ui;
 
-        readonly Dictionary<string, int> _docked = new Dictionary<string, int>();
-        string _instanceKey;
+        private readonly Dictionary<string, int> _docked = new Dictionary<string, int>();
+        private string _instanceKey;
 
+        /// <summary>Docked mods with their API version.</summary>
         public IEnumerable<KeyValuePair<string, int>> DockedMods { get { return _docked; } }
 
+        /// <summary>Announces this copy to other installed copies.</summary>
         public override void LoadData()
         {
             Instance = this;
@@ -50,30 +66,38 @@ namespace Syntrix
                 new MyTuple<string, int, string, Action<int, string>>(Protocol.TagInstance, Protocol.ApiVersion, _instanceKey, OnInstanceReply));
         }
 
+        /// <summary>Starts the services when this copy is the active one.</summary>
         public override void BeforeStart()
         {
             if (!Active)
                 return;
 
-            Events = new EventBus();
+            Events = new EventBus(this);
             Net = new Network(this);
             Blocks = new BlockStore(this);
             Chat = new ChatCommands(this);
+            Settings = new SettingsService(this);
+            Ui = new UiService(this);
             Net.Start();
             Blocks.Start();
             Chat.Start();
+            Settings.Start();
             Started = true;
 
             Log.Info("Syntrix " + Protocol.VersionText + " (API " + Protocol.ApiVersion + ") started, " + (IsServer ? "server" : "client") + (IsPlayer ? " with player" : ""));
             MyAPIGateway.Utilities.SendModMessage(Protocol.ApiChannel, new MyTuple<string, int>(Protocol.TagHello, Protocol.ApiVersion));
         }
 
+        /// <summary>Stops the services.</summary>
         protected override void UnloadData()
         {
             MyAPIGateway.Utilities.UnregisterMessageHandler(Protocol.ApiChannel, OnModMessage);
             if (Started)
             {
                 MyAPIGateway.Utilities.SendModMessage(Protocol.ApiChannel, new MyTuple<string, int>(Protocol.TagBye, Protocol.ApiVersion));
+                Ui.Stop();
+                Settings.Stop();
+                Events.Stop();
                 Chat.Stop();
                 Blocks.Stop();
                 Net.Stop();
@@ -86,14 +110,14 @@ namespace Syntrix
 
         // ---------- copies of the framework ----------
 
-        bool OtherWins(int version, string key)
+        private bool OtherWins(int version, string key)
         {
             if (version != Protocol.ApiVersion)
                 return version > Protocol.ApiVersion;
             return string.CompareOrdinal(key, _instanceKey) < 0;
         }
 
-        void OnInstanceReply(int version, string key)
+        private void OnInstanceReply(int version, string key)
         {
             if (key == _instanceKey || !Active)
                 return;
@@ -101,7 +125,7 @@ namespace Syntrix
                 StepDown(key);
         }
 
-        void StepDown(string winner)
+        private void StepDown(string winner)
         {
             if (!Active)
                 return;
@@ -111,7 +135,7 @@ namespace Syntrix
 
         // ---------- docking ----------
 
-        void OnModMessage(object msg)
+        private void OnModMessage(object msg)
         {
             try
             {
@@ -140,7 +164,7 @@ namespace Syntrix
             }
         }
 
-        void Register(string modName, int apiVersion, Action<object> reply)
+        private void Register(string modName, int apiVersion, Action<object> reply)
         {
             if (string.IsNullOrWhiteSpace(modName))
             {
@@ -164,7 +188,7 @@ namespace Syntrix
         }
 
         /// <summary>Endpoint dictionary for one mod. Keys are never removed or changed in meaning.</summary>
-        IReadOnlyDictionary<string, Delegate> Endpoints(string modName)
+        private IReadOnlyDictionary<string, Delegate> Endpoints(string modName)
         {
             var d = new Dictionary<string, Delegate>();
 
@@ -190,11 +214,74 @@ namespace Syntrix
             d["Events.Unsubscribe"] = new Action<string, Action<object>>((name, h) => Events.Unsubscribe(name, h));
             d["Events.Publish"] = new Action<string, object>((name, payload) => Events.Publish(name, payload));
 
+            // API 2
+            d["Chat.Unregister"] = new Action<string>(cmd => Chat.Unregister(modName, cmd));
+            d["Events.SendToServer"] = new Action<string, string[]>((name, args) => Events.SendToServer(name, args));
+            d["Events.SendToAll"] = new Action<string, string[]>((name, args) => Events.SendToAll(name, args));
+            d["Events.SendToPlayer"] = new Action<string, ulong, string[]>((name, id, args) => Events.SendToPlayer(name, id, args));
+            d["Events.Sender"] = new Func<ulong>(() => Events.Sender);
+            d["Settings.Publish"] = new Action<string, string>((file, text) => Settings.Publish(modName, file, text));
+            d["Settings.Subscribe"] = new Action<string, Action<string>>((file, h) => Settings.Subscribe(modName, file, h));
+
             d["Notify.Player"] = new Action<ulong, string, string, string[], int, string>((id, key, fallback, args, ms, font) => Net.SendNotify(id, key, fallback, args, ms, font));
+
+            // API 2: UI service (players with Rich HUD Master only; elsewhere State is -1 and the rest does nothing)
+            var ui = Ui.Client(modName);
+            d["Ui.State"] = new Func<int>(() => Ui.State);
+            d["Ui.Events"] = new Action<Action<int, int, string>>(h => Ui.SetDispatcher(ui, h));
+            d["Ui.Release"] = new Action(() => ui.Release());
+            d["Ui.Create"] = new Func<int, int, int>((kind, parent) => ui.Create(kind, parent));
+            d["Ui.Remove"] = new Action<int>(h => ui.Remove(h));
+            d["Ui.Clear"] = new Action<int>(h => ui.Clear(h));
+            d["Ui.SetParent"] = new Action<int, int>((h, parent) => ui.SetParent(h, parent));
+            d["Ui.Part"] = new Func<int, int, int>((h, part) => ui.Part(h, part));
+            d["Ui.Listen"] = new Action<int, int, bool>((h, ev, on) => ui.Listen(h, ev, on));
+            d["Ui.SetBool"] = new Action<int, int, bool>(ui.SetBool);
+            d["Ui.SetInt"] = new Action<int, int, int>(ui.SetInt);
+            d["Ui.SetFloat"] = new Action<int, int, float>(ui.SetFloat);
+            d["Ui.SetVector"] = new Action<int, int, Vector2>(ui.SetVector);
+            d["Ui.SetColor"] = new Action<int, int, Color>(ui.SetColor);
+            d["Ui.SetText"] = new Action<int, int, string>(ui.SetText);
+            d["Ui.GetBool"] = new Func<int, int, bool>(ui.GetBool);
+            d["Ui.GetInt"] = new Func<int, int, int>(ui.GetInt);
+            d["Ui.GetFloat"] = new Func<int, int, float>(ui.GetFloat);
+            d["Ui.GetVector"] = new Func<int, int, Vector2>(ui.GetVector);
+            d["Ui.GetColor"] = new Func<int, int, Color>(ui.GetColor);
+            d["Ui.GetText"] = new Func<int, int, string>(ui.GetText);
+            d["Ui.Focus"] = new Action<int>(h => ui.Focus(h));
+            d["Ui.Measure"] = new Func<int, string, float, Vector2>((h, text, wrap) => ui.Measure(h, text, wrap));
+            d["Ui.Screen"] = new Func<Vector2>(() => Ui.ScreenSize);
+            d["Ui.ResScale"] = new Func<float>(() => Ui.ResScale);
+            d["Ui.CursorPos"] = new Func<Vector2>(() => Ui.CursorPosition);
+            d["Ui.Cursor"] = new Action<bool>(on => ui.WantsCursor = on);
+            d["Ui.Bind"] = new Action<string, string>((name, keys) => ui.Bind(name, keys));
+            d["Ui.BindKeys"] = new Func<string, string>(name => ui.BindKeys(name));
+            d["Ui.BindPage"] = new Action<string>(title => ui.BindPage(title));
+            d["Ui.ItemInsert"] = new Func<int, int, string, string, int>(ui.ItemInsert);
+            d["Ui.ItemRemove"] = new Action<int, int>(ui.ItemRemove);
+            d["Ui.ItemText"] = new Action<int, int, string>(ui.ItemText);
+            d["Ui.ItemEnabled"] = new Action<int, int, bool>(ui.ItemEnabled);
+            d["Ui.ItemKey"] = new Func<int, int, string>(ui.ItemKey);
+            d["Ui.ItemFind"] = new Func<int, string, int>(ui.ItemFind);
+            d["Ui.SetVector3"] = new Action<int, int, Vector3D>(ui.SetVector3);
+            d["Ui.GetVector3"] = new Func<int, int, Vector3D>(ui.GetVector3);
+            d["Ui.SetMatrix"] = new Action<int, MatrixD>(ui.SetMatrix);
+            d["Ui.SetPoints"] = new Action<int, Vector2[], int[]>(ui.SetPoints);
+            d["Ui.Clipboard"] = new Func<string>(() => Ui.Clipboard);
+            d["Ui.SetClipboard"] = new Action<string>(text => Ui.Clipboard = text);
+            d["Ui.Terminal"] = new Action<int>(h =>
+            {
+                if (h > 0) ui.OpenTerminal(h);
+                else Ui.Terminal(h);
+            });
+            d["Ui.TerminalOpen"] = new Func<bool>(() => Ui.TerminalIsOpen);
+            d["Ui.ScreenInfo"] = new Func<int, float>(what => Ui.ScreenInfo(what));
+            d["Ui.CursorWorld"] = new Func<Vector3D>(() => Ui.CursorWorld);
 
             return d;
         }
 
+        /// <summary>Promote level of a player.</summary>
         public MyPromoteLevel PromoteLevel(ulong steamId)
         {
             if (!MyAPIGateway.Multiplayer.MultiplayerActive || steamId == MyAPIGateway.Multiplayer.MyId)
@@ -203,56 +290,14 @@ namespace Syntrix
             return p != null ? p.PromoteLevel : MyPromoteLevel.None;
         }
 
-        readonly List<IMyPlayer> _players = new List<IMyPlayer>();
+        private readonly List<IMyPlayer> _players = new List<IMyPlayer>();
 
+        /// <summary>Player with this Steam id, null if not online.</summary>
         public IMyPlayer FindPlayer(ulong steamId)
         {
             _players.Clear();
             MyAPIGateway.Players.GetPlayers(_players, p => p.SteamUserId == steamId);
             return _players.Count > 0 ? _players[0] : null;
         }
-    }
-
-    /// <summary>Local publish/subscribe between mods (same machine only).</summary>
-    public class EventBus
-    {
-        readonly Dictionary<string, List<Action<object>>> _subs = new Dictionary<string, List<Action<object>>>();
-
-        public void Subscribe(string name, Action<object> handler)
-        {
-            if (string.IsNullOrEmpty(name) || handler == null)
-                return;
-            List<Action<object>> list;
-            if (!_subs.TryGetValue(name, out list))
-                _subs[name] = list = new List<Action<object>>();
-            if (!list.Contains(handler))
-                list.Add(handler);
-        }
-
-        public void Unsubscribe(string name, Action<object> handler)
-        {
-            List<Action<object>> list;
-            if (name != null && _subs.TryGetValue(name, out list))
-                list.Remove(handler);
-        }
-
-        public void Publish(string name, object payload)
-        {
-            List<Action<object>> list;
-            if (name == null || !_subs.TryGetValue(name, out list) || list.Count == 0)
-                return;
-            foreach (var h in list.ToArray())
-            {
-                try { h(payload); }
-                catch (Exception e) { Log.Error("event '" + name + "'", e); }
-            }
-        }
-    }
-
-    public static class Log
-    {
-        public static void Info(string text) { MyLog.Default.WriteLineAndConsole("Syntrix: " + text); }
-        public static void Warn(string text) { MyLog.Default.WriteLineAndConsole("Syntrix: WARNING " + text); }
-        public static void Error(string where, Exception e) { MyLog.Default.WriteLineAndConsole("Syntrix: ERROR in " + where + ": " + e); }
     }
 }
