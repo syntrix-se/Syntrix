@@ -1,5 +1,6 @@
 // Syntrix dock file (API version 2, Syntrix 1.1.0). Copy this file into your mod's script folder.
 // Do not edit it; take a newer copy from the Syntrix repository instead.
+// Windows and HUD elements: also copy SyntrixUi.cs (optional second dock file).
 //
 // MIT License - Copyright (c) 2026 Syntrix contributors
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this
@@ -94,6 +95,7 @@ namespace Syntrix.Api
             {
                 IsReady = false;
                 _endpoints = null;
+                Changed();
             }
         }
 
@@ -114,6 +116,7 @@ namespace Syntrix.Api
             FrameworkVersion = r.Item2;
             Bind();
             IsReady = true;
+            Changed();
             if (!first)
                 return;
             var pending = _pending.ToArray();
@@ -154,6 +157,20 @@ namespace Syntrix.Api
         {
             Delegate d;
             return _endpoints != null && _endpoints.TryGetValue(key, out d) ? d as T : null;
+        }
+
+        /// <summary>API 2. For the other dock files (SyntrixUi): runs when the endpoints were (re)bound or dropped.</summary>
+        internal event Action EndpointsChanged;
+
+        /// <summary>API 2. Endpoint by name for the other dock files, null if missing.</summary>
+        internal T Endpoint<T>(string key) where T : class { return Get<T>(key); }
+
+        void Changed()
+        {
+            if (EndpointsChanged == null)
+                return;
+            try { EndpointsChanged(); }
+            catch (Exception e) { MyLog.Default.WriteLineAndConsole(ModName + ": ERROR in Syntrix dock file: " + e); }
         }
 
         // ---------- endpoints ----------

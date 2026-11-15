@@ -7,6 +7,7 @@ using VRage;
 using VRage.Game;
 using VRage.Game.Components;
 using VRage.Game.ModAPI;
+using Syntrix.Ui;
 using VRage.Utils;
 using VRageMath;
 
@@ -31,6 +32,7 @@ namespace Syntrix
         public ChatCommands Chat;
         public EventBus Events;
         public SettingsService Settings;
+        public UiService Ui;
 
         readonly Dictionary<string, int> _docked = new Dictionary<string, int>();
         string _instanceKey;
@@ -61,6 +63,7 @@ namespace Syntrix
             Blocks = new BlockStore(this);
             Chat = new ChatCommands(this);
             Settings = new SettingsService(this);
+            Ui = new UiService(this);
             Net.Start();
             Blocks.Start();
             Chat.Start();
@@ -77,6 +80,7 @@ namespace Syntrix
             if (Started)
             {
                 MyAPIGateway.Utilities.SendModMessage(Protocol.ApiChannel, new MyTuple<string, int>(Protocol.TagBye, Protocol.ApiVersion));
+                Ui.Stop();
                 Settings.Stop();
                 Events.Stop();
                 Chat.Stop();
@@ -205,6 +209,39 @@ namespace Syntrix
             d["Settings.Subscribe"] = new Action<string, Action<string>>((file, h) => Settings.Subscribe(modName, file, h));
 
             d["Notify.Player"] = new Action<ulong, string, string, string[], int, string>((id, key, fallback, args, ms, font) => Net.SendNotify(id, key, fallback, args, ms, font));
+
+            // API 2: UI service (players with Rich HUD Master only; elsewhere State is -1 and the rest does nothing)
+            var ui = Ui.Client(modName);
+            d["Ui.State"] = new Func<int>(() => Ui.State);
+            d["Ui.Events"] = new Action<Action<int, int, string>>(h => Ui.SetDispatcher(ui, h));
+            d["Ui.Release"] = new Action(() => ui.Release());
+            d["Ui.Create"] = new Func<int, int, int>((kind, parent) => ui.Create(kind, parent));
+            d["Ui.Remove"] = new Action<int>(h => ui.Remove(h));
+            d["Ui.Clear"] = new Action<int>(h => ui.Clear(h));
+            d["Ui.SetParent"] = new Action<int, int>((h, parent) => ui.SetParent(h, parent));
+            d["Ui.Part"] = new Func<int, int, int>((h, part) => ui.Part(h, part));
+            d["Ui.Listen"] = new Action<int, int, bool>((h, ev, on) => ui.Listen(h, ev, on));
+            d["Ui.SetBool"] = new Action<int, int, bool>(ui.SetBool);
+            d["Ui.SetInt"] = new Action<int, int, int>(ui.SetInt);
+            d["Ui.SetFloat"] = new Action<int, int, float>(ui.SetFloat);
+            d["Ui.SetVector"] = new Action<int, int, Vector2>(ui.SetVector);
+            d["Ui.SetColor"] = new Action<int, int, Color>(ui.SetColor);
+            d["Ui.SetText"] = new Action<int, int, string>(ui.SetText);
+            d["Ui.GetBool"] = new Func<int, int, bool>(ui.GetBool);
+            d["Ui.GetInt"] = new Func<int, int, int>(ui.GetInt);
+            d["Ui.GetFloat"] = new Func<int, int, float>(ui.GetFloat);
+            d["Ui.GetVector"] = new Func<int, int, Vector2>(ui.GetVector);
+            d["Ui.GetColor"] = new Func<int, int, Color>(ui.GetColor);
+            d["Ui.GetText"] = new Func<int, int, string>(ui.GetText);
+            d["Ui.Focus"] = new Action<int>(h => ui.Focus(h));
+            d["Ui.Measure"] = new Func<int, string, float, Vector2>((h, text, wrap) => ui.Measure(h, text, wrap));
+            d["Ui.Screen"] = new Func<Vector2>(() => Ui.ScreenSize);
+            d["Ui.ResScale"] = new Func<float>(() => Ui.ResScale);
+            d["Ui.CursorPos"] = new Func<Vector2>(() => Ui.CursorPosition);
+            d["Ui.Cursor"] = new Action<bool>(on => ui.WantsCursor = on);
+            d["Ui.Bind"] = new Action<string, string>((name, keys) => ui.Bind(name, keys));
+            d["Ui.BindKeys"] = new Func<string, string>(name => ui.BindKeys(name));
+            d["Ui.BindPage"] = new Action<string>(title => ui.BindPage(title));
 
             return d;
         }
