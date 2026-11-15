@@ -16,10 +16,13 @@ namespace Syntrix.Ui
         private Vector2 _lastSize;
         private bool _lit;
 
+        /// <summary>Background box.</summary>
         public readonly TexturedBox Background;
+        /// <summary>Mouse input, hidden until needed.</summary>
         public readonly MouseInputElement Input;
         private BorderBox _border;
 
+        /// <summary>Makes the panel of a node.</summary>
         public PanelElement(UiNode node) : base(null)
         {
             _node = node;
@@ -33,6 +36,7 @@ namespace Syntrix.Ui
             Size = new Vector2(100f, 40f);
         }
 
+        /// <summary>Background colour.</summary>
         public Color Color
         {
             get { return _color; }
@@ -57,8 +61,10 @@ namespace Syntrix.Ui
             }
         }
 
+        /// <summary>A border was made.</summary>
         public bool HasBorder { get { return _border != null; } }
 
+        /// <summary>Applies the highlight colour and raises Resized when the size changed.</summary>
         protected override void Layout()
         {
             base.Layout();

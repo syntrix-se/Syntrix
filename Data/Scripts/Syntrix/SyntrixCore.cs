@@ -20,25 +20,38 @@ namespace Syntrix
     [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate, int.MinValue + 100)]
     public class SyntrixCore : MySessionComponentBase
     {
+        /// <summary>The running session component.</summary>
         public static SyntrixCore Instance;
 
+        /// <summary>This copy is the active Syntrix (highest version).</summary>
         public bool Active { get; private set; }
+        /// <summary>The services are running.</summary>
         public bool Started { get; private set; }
+        /// <summary>Runs on the server (or single player).</summary>
         public bool IsServer { get; private set; }
+        /// <summary>Has a local player (not a dedicated server).</summary>
         public bool IsPlayer { get; private set; }
 
+        /// <summary>Network service.</summary>
         public Network Net;
+        /// <summary>Block settings service.</summary>
         public BlockStore Blocks;
+        /// <summary>Chat command service.</summary>
         public ChatCommands Chat;
+        /// <summary>Event service.</summary>
         public EventBus Events;
+        /// <summary>Settings service.</summary>
         public SettingsService Settings;
+        /// <summary>UI service.</summary>
         public UiService Ui;
 
-        readonly Dictionary<string, int> _docked = new Dictionary<string, int>();
-        string _instanceKey;
+        private readonly Dictionary<string, int> _docked = new Dictionary<string, int>();
+        private string _instanceKey;
 
+        /// <summary>Docked mods with their API version.</summary>
         public IEnumerable<KeyValuePair<string, int>> DockedMods { get { return _docked; } }
 
+        /// <summary>Announces this copy to other installed copies.</summary>
         public override void LoadData()
         {
             Instance = this;
@@ -53,6 +66,7 @@ namespace Syntrix
                 new MyTuple<string, int, string, Action<int, string>>(Protocol.TagInstance, Protocol.ApiVersion, _instanceKey, OnInstanceReply));
         }
 
+        /// <summary>Starts the services when this copy is the active one.</summary>
         public override void BeforeStart()
         {
             if (!Active)
@@ -74,6 +88,7 @@ namespace Syntrix
             MyAPIGateway.Utilities.SendModMessage(Protocol.ApiChannel, new MyTuple<string, int>(Protocol.TagHello, Protocol.ApiVersion));
         }
 
+        /// <summary>Stops the services.</summary>
         protected override void UnloadData()
         {
             MyAPIGateway.Utilities.UnregisterMessageHandler(Protocol.ApiChannel, OnModMessage);
@@ -95,14 +110,14 @@ namespace Syntrix
 
         // ---------- copies of the framework ----------
 
-        bool OtherWins(int version, string key)
+        private bool OtherWins(int version, string key)
         {
             if (version != Protocol.ApiVersion)
                 return version > Protocol.ApiVersion;
             return string.CompareOrdinal(key, _instanceKey) < 0;
         }
 
-        void OnInstanceReply(int version, string key)
+        private void OnInstanceReply(int version, string key)
         {
             if (key == _instanceKey || !Active)
                 return;
@@ -110,7 +125,7 @@ namespace Syntrix
                 StepDown(key);
         }
 
-        void StepDown(string winner)
+        private void StepDown(string winner)
         {
             if (!Active)
                 return;
@@ -120,7 +135,7 @@ namespace Syntrix
 
         // ---------- docking ----------
 
-        void OnModMessage(object msg)
+        private void OnModMessage(object msg)
         {
             try
             {
@@ -149,7 +164,7 @@ namespace Syntrix
             }
         }
 
-        void Register(string modName, int apiVersion, Action<object> reply)
+        private void Register(string modName, int apiVersion, Action<object> reply)
         {
             if (string.IsNullOrWhiteSpace(modName))
             {
@@ -173,7 +188,7 @@ namespace Syntrix
         }
 
         /// <summary>Endpoint dictionary for one mod. Keys are never removed or changed in meaning.</summary>
-        IReadOnlyDictionary<string, Delegate> Endpoints(string modName)
+        private IReadOnlyDictionary<string, Delegate> Endpoints(string modName)
         {
             var d = new Dictionary<string, Delegate>();
 
@@ -242,10 +257,31 @@ namespace Syntrix
             d["Ui.Bind"] = new Action<string, string>((name, keys) => ui.Bind(name, keys));
             d["Ui.BindKeys"] = new Func<string, string>(name => ui.BindKeys(name));
             d["Ui.BindPage"] = new Action<string>(title => ui.BindPage(title));
+            d["Ui.ItemInsert"] = new Func<int, int, string, string, int>(ui.ItemInsert);
+            d["Ui.ItemRemove"] = new Action<int, int>(ui.ItemRemove);
+            d["Ui.ItemText"] = new Action<int, int, string>(ui.ItemText);
+            d["Ui.ItemEnabled"] = new Action<int, int, bool>(ui.ItemEnabled);
+            d["Ui.ItemKey"] = new Func<int, int, string>(ui.ItemKey);
+            d["Ui.ItemFind"] = new Func<int, string, int>(ui.ItemFind);
+            d["Ui.SetVector3"] = new Action<int, int, Vector3D>(ui.SetVector3);
+            d["Ui.GetVector3"] = new Func<int, int, Vector3D>(ui.GetVector3);
+            d["Ui.SetMatrix"] = new Action<int, MatrixD>(ui.SetMatrix);
+            d["Ui.SetPoints"] = new Action<int, Vector2[], int[]>(ui.SetPoints);
+            d["Ui.Clipboard"] = new Func<string>(() => Ui.Clipboard);
+            d["Ui.SetClipboard"] = new Action<string>(text => Ui.Clipboard = text);
+            d["Ui.Terminal"] = new Action<int>(h =>
+            {
+                if (h > 0) ui.OpenTerminal(h);
+                else Ui.Terminal(h);
+            });
+            d["Ui.TerminalOpen"] = new Func<bool>(() => Ui.TerminalIsOpen);
+            d["Ui.ScreenInfo"] = new Func<int, float>(what => Ui.ScreenInfo(what));
+            d["Ui.CursorWorld"] = new Func<Vector3D>(() => Ui.CursorWorld);
 
             return d;
         }
 
+        /// <summary>Promote level of a player.</summary>
         public MyPromoteLevel PromoteLevel(ulong steamId)
         {
             if (!MyAPIGateway.Multiplayer.MultiplayerActive || steamId == MyAPIGateway.Multiplayer.MyId)
@@ -254,20 +290,14 @@ namespace Syntrix
             return p != null ? p.PromoteLevel : MyPromoteLevel.None;
         }
 
-        readonly List<IMyPlayer> _players = new List<IMyPlayer>();
+        private readonly List<IMyPlayer> _players = new List<IMyPlayer>();
 
+        /// <summary>Player with this Steam id, null if not online.</summary>
         public IMyPlayer FindPlayer(ulong steamId)
         {
             _players.Clear();
             MyAPIGateway.Players.GetPlayers(_players, p => p.SteamUserId == steamId);
             return _players.Count > 0 ? _players[0] : null;
         }
-    }
-
-    public static class Log
-    {
-        public static void Info(string text) { MyLog.Default.WriteLineAndConsole("Syntrix: " + text); }
-        public static void Warn(string text) { MyLog.Default.WriteLineAndConsole("Syntrix: WARNING " + text); }
-        public static void Error(string where, Exception e) { MyLog.Default.WriteLineAndConsole("Syntrix: ERROR in " + where + ": " + e); }
     }
 }

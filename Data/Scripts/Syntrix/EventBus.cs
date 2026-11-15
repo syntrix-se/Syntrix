@@ -13,21 +13,24 @@ namespace Syntrix
     /// </summary>
     public class EventBus
     {
-        const long TargetServer = 1;
-        const long TargetPlayer = 2;
-        const int MaxNameLength = 128;
+        private const long TargetServer = 1;
+        private const long TargetPlayer = 2;
+        private const int MaxNameLength = 128;
 
-        readonly SyntrixCore _core;
-        readonly Dictionary<string, List<Action<object>>> _subs = new Dictionary<string, List<Action<object>>>();
-        ulong _sender;
+        private readonly SyntrixCore _core;
+        private readonly Dictionary<string, List<Action<object>>> _subs = new Dictionary<string, List<Action<object>>>();
+        private ulong _sender;
 
+        /// <summary>Makes the event service.</summary>
         public EventBus(SyntrixCore core) { _core = core; }
 
         /// <summary>Sender of the network event being handled right now, 0 for local events.</summary>
         public ulong Sender { get { return _sender; } }
 
+        /// <summary>Forgets all subscriptions.</summary>
         public void Stop() { _subs.Clear(); }
 
+        /// <summary>Handler for an event name.</summary>
         public void Subscribe(string name, Action<object> handler)
         {
             if (string.IsNullOrEmpty(name) || handler == null)
@@ -39,6 +42,7 @@ namespace Syntrix
                 list.Add(handler);
         }
 
+        /// <summary>Removes an event handler.</summary>
         public void Unsubscribe(string name, Action<object> handler)
         {
             List<Action<object>> list;
@@ -46,9 +50,10 @@ namespace Syntrix
                 list.Remove(handler);
         }
 
+        /// <summary>Raises an event locally.</summary>
         public void Publish(string name, object payload) { Dispatch(name, payload, 0); }
 
-        void Dispatch(string name, object payload, ulong sender)
+        private void Dispatch(string name, object payload, ulong sender)
         {
             List<Action<object>> list;
             if (name == null || !_subs.TryGetValue(name, out list) || list.Count == 0)
@@ -68,14 +73,14 @@ namespace Syntrix
 
         // ---------- network (API 2) ----------
 
-        static bool Valid(string name, string[] args)
+        private static bool Valid(string name, string[] args)
         {
             if (string.IsNullOrEmpty(name) || name.Length > MaxNameLength)
                 return false;
             return args == null || args.Length <= Protocol.MaxEventArgs;
         }
 
-        static string[] Copy(string[] args)
+        private static string[] Copy(string[] args)
         {
             if (args == null)
                 return new string[0];
@@ -85,6 +90,7 @@ namespace Syntrix
             return c;
         }
 
+        /// <summary>Sends an event to the server.</summary>
         public void SendToServer(string name, string[] args)
         {
             if (!Valid(name, args))
@@ -97,6 +103,7 @@ namespace Syntrix
             _core.Net.RawToServer(new Packet { Kind = PacketKind.Event, Channel = name, EntityId = TargetServer, Texts = Copy(args) });
         }
 
+        /// <summary>Sends an event to the server and every player.</summary>
         public void SendToAll(string name, string[] args)
         {
             if (!_core.IsServer || !Valid(name, args))
@@ -106,6 +113,7 @@ namespace Syntrix
             _core.Net.RawToOthers(new Packet { Kind = PacketKind.Event, Channel = name, EntityId = TargetPlayer, Texts = Copy(args) });
         }
 
+        /// <summary>Sends an event to one player.</summary>
         public void SendToPlayer(string name, ulong steamId, string[] args)
         {
             if (!_core.IsServer || !Valid(name, args))
@@ -118,6 +126,7 @@ namespace Syntrix
             _core.Net.RawToPlayer(new Packet { Kind = PacketKind.Event, Channel = name, EntityId = TargetPlayer, Texts = Copy(args) }, steamId);
         }
 
+        /// <summary>Handles an event packet from the network.</summary>
         public void OnPacket(Packet p, ulong sender, bool fromServer)
         {
             if (!Valid(p.Channel, p.Texts))

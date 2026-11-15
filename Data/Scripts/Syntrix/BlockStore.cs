@@ -19,18 +19,21 @@ namespace Syntrix
         /// <summary>Storage GUID, registered in Data/EntityComponents_Syntrix.sbc.</summary>
         public static readonly Guid StorageGuid = new Guid("583FC123-E62D-4269-A84C-14B32976D720");
 
-        const char FieldSep = '\u001F';
-        const char EntrySep = '\u001E';
+        private const char FieldSep = '\u001F';
+        private const char EntrySep = '\u001E';
 
-        readonly SyntrixCore _core;
-        readonly Dictionary<long, Dictionary<string, string>> _cache = new Dictionary<long, Dictionary<string, string>>();
-        readonly HashSet<long> _syncRequested = new HashSet<long>();
-        readonly Dictionary<string, List<Action<long, string, string>>> _subs = new Dictionary<string, List<Action<long, string, string>>>();
+        private readonly SyntrixCore _core;
+        private readonly Dictionary<long, Dictionary<string, string>> _cache = new Dictionary<long, Dictionary<string, string>>();
+        private readonly HashSet<long> _syncRequested = new HashSet<long>();
+        private readonly Dictionary<string, List<Action<long, string, string>>> _subs = new Dictionary<string, List<Action<long, string, string>>>();
 
+        /// <summary>Makes the block settings service.</summary>
         public BlockStore(SyntrixCore core) { _core = core; }
 
+        /// <summary>Starts watching removed entities.</summary>
         public void Start() { MyAPIGateway.Entities.OnEntityRemove += OnEntityRemove; }
 
+        /// <summary>Stops the service and forgets all values.</summary>
         public void Stop()
         {
             MyAPIGateway.Entities.OnEntityRemove -= OnEntityRemove;
@@ -38,7 +41,7 @@ namespace Syntrix
             _subs.Clear();
         }
 
-        void OnEntityRemove(IMyEntity e)
+        private void OnEntityRemove(IMyEntity e)
         {
             if (e == null)
                 return;
@@ -46,10 +49,11 @@ namespace Syntrix
             _syncRequested.Remove(e.EntityId);
         }
 
-        static string Key(string mod, string key) { return mod + FieldSep + key; }
+        private static string Key(string mod, string key) { return mod + FieldSep + key; }
 
         // ---------- reading ----------
 
+        /// <summary>Value of a block setting, null if not set.</summary>
         public string Get(long entityId, string mod, string key)
         {
             if (mod == null || key == null)
@@ -59,7 +63,7 @@ namespace Syntrix
             return values != null && values.TryGetValue(Key(mod, key), out v) ? v : null;
         }
 
-        Dictionary<string, string> Values(long entityId, bool requestSync)
+        private Dictionary<string, string> Values(long entityId, bool requestSync)
         {
             Dictionary<string, string> values;
             if (_cache.TryGetValue(entityId, out values))
@@ -77,6 +81,7 @@ namespace Syntrix
             return values;
         }
 
+        /// <summary>Asks the server for the settings of a block (players only).</summary>
         public void RequestSync(long entityId)
         {
             if (_core.IsServer)
@@ -87,6 +92,7 @@ namespace Syntrix
 
         // ---------- writing ----------
 
+        /// <summary>Sets a block setting: on the server directly, on a player at once locally and through the server (access check there).</summary>
         public void Set(long entityId, string mod, string key, string value)
         {
             if (mod == null || key == null)
@@ -106,14 +112,14 @@ namespace Syntrix
             _core.Net.ToServer(new Packet { Kind = PacketKind.BlockSet, EntityId = entityId, Texts = new[] { mod, key, value ?? "" } });
         }
 
-        static string Clean(string s)
+        private static string Clean(string s)
         {
             if (s == null || (s.IndexOf(FieldSep) < 0 && s.IndexOf(EntrySep) < 0))
                 return s;
             return s.Replace(FieldSep, ' ').Replace(EntrySep, ' ');
         }
 
-        void Apply(long entityId, string mod, string key, string value)
+        private void Apply(long entityId, string mod, string key, string value)
         {
             mod = Clean(mod);
             key = Clean(key);
@@ -142,7 +148,7 @@ namespace Syntrix
             _core.Net.ToAll(new Packet { Kind = PacketKind.BlockValues, EntityId = entityId, Texts = Flatten(values) });
         }
 
-        static void Put(Dictionary<string, string> values, string k, string value)
+        private static void Put(Dictionary<string, string> values, string k, string value)
         {
             if (string.IsNullOrEmpty(value))
                 values.Remove(k);
@@ -152,6 +158,7 @@ namespace Syntrix
 
         // ---------- network ----------
 
+        /// <summary>Handles a block packet from the network.</summary>
         public void OnPacket(Packet p, ulong sender)
         {
             switch (p.Kind)
@@ -182,14 +189,14 @@ namespace Syntrix
             }
         }
 
-        void SendValues(long entityId, ulong steamId)
+        private void SendValues(long entityId, ulong steamId)
         {
             var values = Values(entityId, false);
             if (values != null)
                 _core.Net.ToPlayer(new Packet { Kind = PacketKind.BlockValues, EntityId = entityId, Texts = Flatten(values) }, steamId);
         }
 
-        bool HasAccess(long entityId, ulong steamId)
+        private bool HasAccess(long entityId, ulong steamId)
         {
             var block = MyAPIGateway.Entities.GetEntityById(entityId) as IMyTerminalBlock;
             if (block == null)
@@ -202,6 +209,7 @@ namespace Syntrix
 
         // ---------- change events ----------
 
+        /// <summary>Handler for changed settings of a mod.</summary>
         public void Subscribe(string mod, Action<long, string, string> handler)
         {
             if (mod == null || handler == null)
@@ -213,6 +221,7 @@ namespace Syntrix
                 list.Add(handler);
         }
 
+        /// <summary>Removes a change handler.</summary>
         public void Unsubscribe(string mod, Action<long, string, string> handler)
         {
             List<Action<long, string, string>> list;
@@ -220,7 +229,7 @@ namespace Syntrix
                 list.Remove(handler);
         }
 
-        void Raise(long entityId, string mod, string key, string value)
+        private void Raise(long entityId, string mod, string key, string value)
         {
             List<Action<long, string, string>> list;
             if (!_subs.TryGetValue(mod, out list))
@@ -232,7 +241,7 @@ namespace Syntrix
             }
         }
 
-        void RaiseDiff(long entityId, Dictionary<string, string> old, Dictionary<string, string> fresh)
+        private void RaiseDiff(long entityId, Dictionary<string, string> old, Dictionary<string, string> fresh)
         {
             foreach (var kv in fresh)
             {
@@ -247,7 +256,7 @@ namespace Syntrix
                     RaiseKey(entityId, kv.Key, null);
         }
 
-        void RaiseKey(long entityId, string compound, string value)
+        private void RaiseKey(long entityId, string compound, string value)
         {
             int i = compound.IndexOf(FieldSep);
             if (i > 0)
@@ -256,7 +265,7 @@ namespace Syntrix
 
         // ---------- storage format ----------
 
-        static string ReadStorage(IMyEntity entity)
+        private static string ReadStorage(IMyEntity entity)
         {
             string s;
             if (entity.Storage != null && entity.Storage.TryGetValue(StorageGuid, out s))
@@ -264,7 +273,7 @@ namespace Syntrix
             return null;
         }
 
-        static void WriteStorage(IMyEntity entity, Dictionary<string, string> values)
+        private static void WriteStorage(IMyEntity entity, Dictionary<string, string> values)
         {
             if (entity.Storage == null)
                 entity.Storage = new MyModStorageComponent();
@@ -279,7 +288,7 @@ namespace Syntrix
         }
 
         /// <summary>Entry = mod FS key FS value; values must not contain the two separators.</summary>
-        static Dictionary<string, string> Parse(string s)
+        private static Dictionary<string, string> Parse(string s)
         {
             var d = new Dictionary<string, string>();
             if (string.IsNullOrEmpty(s))
@@ -294,7 +303,7 @@ namespace Syntrix
             return d;
         }
 
-        static string[] Flatten(Dictionary<string, string> values)
+        private static string[] Flatten(Dictionary<string, string> values)
         {
             var list = new List<string>(values.Count * 2);
             foreach (var kv in values)
@@ -305,7 +314,7 @@ namespace Syntrix
             return list.ToArray();
         }
 
-        static Dictionary<string, string> Unflatten(string[] texts)
+        private static Dictionary<string, string> Unflatten(string[] texts)
         {
             var d = new Dictionary<string, string>();
             if (texts == null)

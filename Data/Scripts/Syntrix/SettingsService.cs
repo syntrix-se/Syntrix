@@ -13,27 +13,30 @@ namespace Syntrix
     /// </summary>
     public class SettingsService
     {
-        const char Sep = '\u001F';
+        private const char Sep = '\u001F';
 
-        readonly SyntrixCore _core;
-        readonly Dictionary<string, string> _values = new Dictionary<string, string>();
-        readonly Dictionary<string, List<Action<string>>> _subs = new Dictionary<string, List<Action<string>>>();
+        private readonly SyntrixCore _core;
+        private readonly Dictionary<string, string> _values = new Dictionary<string, string>();
+        private readonly Dictionary<string, List<Action<string>>> _subs = new Dictionary<string, List<Action<string>>>();
 
+        /// <summary>Makes the settings service.</summary>
         public SettingsService(SyntrixCore core) { _core = core; }
 
+        /// <summary>Starts the service.</summary>
         public void Start()
         {
             if (!_core.IsServer)
                 _core.Net.RawToServer(new Packet { Kind = PacketKind.SettingsRequest });
         }
 
+        /// <summary>Stops the service and forgets all settings.</summary>
         public void Stop()
         {
             _values.Clear();
             _subs.Clear();
         }
 
-        static string Key(string mod, string file) { return mod + Sep + file; }
+        private static string Key(string mod, string file) { return mod + Sep + file; }
 
         /// <summary>Server: keep the text and send it to every other machine.</summary>
         public void Publish(string mod, string file, string text)
@@ -67,11 +70,12 @@ namespace Syntrix
                 Call(mod, file, handler, text);
         }
 
-        static Packet Value(string mod, string file, string text)
+        private static Packet Value(string mod, string file, string text)
         {
             return new Packet { Kind = PacketKind.SettingsValue, Channel = mod, Texts = new[] { file, text } };
         }
 
+        /// <summary>Handles a settings packet from the network.</summary>
         public void OnPacket(Packet p, ulong sender, bool fromServer)
         {
             if (p.Kind == PacketKind.SettingsRequest)
@@ -98,7 +102,7 @@ namespace Syntrix
             }
         }
 
-        static void Call(string mod, string file, Action<string> handler, string text)
+        private static void Call(string mod, string file, Action<string> handler, string text)
         {
             try { handler(text); }
             catch (Exception e) { Log.Error("settings '" + file + "' of " + mod, e); }

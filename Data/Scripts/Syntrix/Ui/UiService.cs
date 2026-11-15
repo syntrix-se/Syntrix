@@ -29,13 +29,18 @@ namespace Syntrix.Ui
         private const ulong RichHudMasterId = 1965654081;
         private const int WaitTicks = 15 * 60;
 
+        /// <summary>The running UI service.</summary>
         public static UiService Instance { get; private set; }
 
         private struct Pending
         {
+            /// <summary>Receiving mod.</summary>
             public UiClient Client;
+            /// <summary>Element handle; 0 = service event.</summary>
             public int Handle;
+            /// <summary>UiEvent number.</summary>
             public int Event;
+            /// <summary>Argument or null.</summary>
             public string Arg;
         }
 
@@ -52,6 +57,7 @@ namespace Syntrix.Ui
 
         private static int _frame, _typingFrame = -100;
 
+        /// <summary>Makes the UI service.</summary>
         public UiService(SyntrixCore core)
         {
             _core = core;
@@ -67,8 +73,10 @@ namespace Syntrix.Ui
         /// <summary>True while a text field took typing in this or the last two frames.</summary>
         public static bool TypedRecently { get { return _frame - _typingFrame <= 2; } }
 
+        /// <summary>Notes that a text field took a key this frame.</summary>
         public static void MarkTyping() { _typingFrame = _frame; }
 
+        /// <summary>UI state of a mod, made on first use.</summary>
         public UiClient Client(string modName)
         {
             UiClient c;
@@ -77,6 +85,7 @@ namespace Syntrix.Ui
             return c;
         }
 
+        /// <summary>Saves the binds, gives back HUD and cursor and forgets all mods.</summary>
         public void Stop()
         {
             try
@@ -105,6 +114,7 @@ namespace Syntrix.Ui
 
         // ---------------------------------------------------------------- Rich HUD client
 
+        /// <summary>Sets the event receiver of a mod, starts the Rich HUD client on first use and queues Ready or Unavailable.</summary>
         public void SetDispatcher(UiClient c, Action<int, int, string> dispatcher)
         {
             // The same dispatcher again (the mod docked again): no second Ready
@@ -165,6 +175,7 @@ namespace Syntrix.Ui
 
         // ---------------------------------------------------------------- events
 
+        /// <summary>Queues an event; sent after the Rich HUD update.</summary>
         public void Queue(UiClient c, int handle, int ev, string arg)
         {
             _queue.Add(new Pending { Client = c, Handle = handle, Event = ev, Arg = arg });
@@ -190,6 +201,7 @@ namespace Syntrix.Ui
             list.Clear();
         }
 
+        /// <summary>Queues a bind event unless the player types.</summary>
         public void BindPressed(UiClient c, string name)
         {
             if (TypedRecently || MyAPIGateway.Gui.ChatEntryVisible)
@@ -197,10 +209,13 @@ namespace Syntrix.Ui
             Queue(c, 0, (int)UiEvent.BindPressed, name);
         }
 
+        /// <summary>Asks for the rebind pages once Rich HUD is ready.</summary>
         public void WantPages() { _wantPages = true; }
 
+        /// <summary>Tracks a window (cursor, Escape, focus).</summary>
         public void AddWindow(UiNode n) { _windows.Add(n); }
 
+        /// <summary>Stops tracking a window.</summary>
         public void RemoveWindow(UiNode n)
         {
             _windows.Remove(n);
@@ -337,6 +352,7 @@ namespace Syntrix.Ui
 
         // ---------------------------------------------------------------- helpers
 
+        /// <summary>Size of a markup text in a format.</summary>
         public Vector2 Measure(string markup, UiMarkup.Style style, float wrapWidth)
         {
             if (!_ready)
@@ -350,11 +366,66 @@ namespace Syntrix.Ui
             return _measure.TextSize;
         }
 
+        /// <summary>Screen size in pixels; zero before the UI is ready.</summary>
         public Vector2 ScreenSize { get { return _ready ? new Vector2(HudMain.ScreenWidth, HudMain.ScreenHeight) : Vector2.Zero; } }
 
+        /// <summary>Resolution scale of the high-DPI root.</summary>
         public float ResScale { get { return _ready ? HudMain.ResScale : 1f; } }
 
+        /// <summary>Cursor position on the screen (centre origin).</summary>
         public Vector2 CursorPosition { get { return _ready && HudMain.Cursor != null ? HudMain.Cursor.ScreenPos : Vector2.Zero; } }
+
+        /// <summary>Cursor position in the world.</summary>
+        public Vector3D CursorWorld { get { return _ready && HudMain.Cursor != null ? HudMain.Cursor.WorldPos : Vector3D.Zero; } }
+
+        /// <summary>Rich HUD clipboard as plain text.</summary>
+        public string Clipboard
+        {
+            get { return _ready ? HudMain.ClipBoard.ToString() : null; }
+            set { if (_ready) HudMain.ClipBoard = new RichText(value ?? ""); }
+        }
+
+        /// <summary>True while the Rich HUD terminal is open.</summary>
+        public bool TerminalIsOpen { get { return _ready && RichHudTerminal.Open; } }
+
+        /// <summary>
+        /// Opens or closes the Rich HUD terminal: -1 close, -2 toggle, otherwise open.
+        /// </summary>
+        /// <param name="mode">-1 close, -2 toggle, otherwise open.</param>
+        public void Terminal(int mode)
+        {
+            if (!_ready)
+                return;
+            if (mode == -1) RichHudTerminal.CloseMenu();
+            else if (mode == -2) RichHudTerminal.ToggleMenu();
+            else RichHudTerminal.OpenMenu();
+        }
+
+        /// <summary>
+        /// Screen values: 0 width, 1 height, 2 aspect ratio, 3 field of view (radians), 4 FOV scale,
+        /// 5 UI background opacity, 6 resolution scale, 7 input mode (0 default, 1 cursor, 2 text input),
+        /// 8 cursor visible (1/0), 9 cursor captured (1/0).
+        /// </summary>
+        /// <param name="what">Number of the value.</param>
+        public float ScreenInfo(int what)
+        {
+            if (!_ready)
+                return 0f;
+            switch (what)
+            {
+                case 0: return HudMain.ScreenWidth;
+                case 1: return HudMain.ScreenHeight;
+                case 2: return HudMain.AspectRatio;
+                case 3: return HudMain.Fov;
+                case 4: return HudMain.FovScale;
+                case 5: return HudMain.UiBkOpacity;
+                case 6: return HudMain.ResScale;
+                case 7: return (float)(int)HudMain.InputMode;
+                case 8: return HudMain.Cursor != null && HudMain.Cursor.Visible ? 1f : 0f;
+                case 9: return HudMain.Cursor != null && HudMain.Cursor.IsCaptured ? 1f : 0f;
+            }
+            return 0f;
+        }
 
         private static string BindFile(string modName)
         {
@@ -382,6 +453,7 @@ namespace Syntrix.Ui
             }
         }
 
+        /// <summary>Saves the binds of a mod in the local storage.</summary>
         public void SaveBinds(string modName, BindDefinition[] binds)
         {
             using (var w = MyAPIGateway.Utilities.WriteFileInLocalStorage(BindFile(modName), typeof(UiService)))

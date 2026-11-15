@@ -22,19 +22,25 @@ namespace Syntrix.Ui
         /// <summary>Base text format of an element.</summary>
         public struct Style
         {
+            /// <summary>Text colour.</summary>
             public Color Color;
+            /// <summary>Font size (1 = normal).</summary>
             public float Size;
             /// <summary>Font index, -1 = Rich HUD default font.</summary>
             public int Font;
             /// <summary>Bit 1 bold, bit 2 italic, bit 4 underline.</summary>
             public int FontStyle;
+            /// <summary>Text alignment.</summary>
             public TextAlignment Align;
         }
 
         private struct Frame
         {
+            /// <summary>Tag name.</summary>
             public string Tag;
+            /// <summary>Format before the tag.</summary>
             public Style Before;
+            /// <summary>Link target before the tag.</summary>
             public string LinkBefore;
         }
 

@@ -18,11 +18,13 @@ namespace Syntrix.Ui
         /// <summary>Upper limit for the wrap width from WrapToParent; zero = none.</summary>
         public float WrapMax;
 
+        /// <summary>Makes the label of a node.</summary>
         public LabelElement(UiNode node) : base(null)
         {
             _node = node;
         }
 
+        /// <summary>Follows the parent width when wrapping to the parent.</summary>
         protected override void Layout()
         {
             base.Layout();

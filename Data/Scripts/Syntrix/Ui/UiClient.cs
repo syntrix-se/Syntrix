@@ -16,6 +16,7 @@ namespace Syntrix.Ui
     {
         private const int IndexMask = 0xFFFFF;
 
+        /// <summary>Name of the docked mod.</summary>
         public readonly string ModName;
         private readonly UiService _service;
         private readonly List<UiNode> _nodes = new List<UiNode> { null };
@@ -39,14 +40,23 @@ namespace Syntrix.Ui
         private string _pageTitle;
         private bool _pageMade;
 
+        /// <summary>Makes the UI state of a mod.</summary>
+        /// <param name="service">The UI service.</param>
+        /// <param name="modName">Name of the docked mod.</param>
         public UiClient(UiService service, string modName)
         {
             _service = service;
             ModName = modName;
         }
 
+        /// <summary>Queues an event of a node.</summary>
+        /// <param name="node">The node.</param>
+        /// <param name="ev">UiEvent number.</param>
+        /// <param name="arg">Argument or null.</param>
         public void Queue(UiNode node, int ev, string arg) { _service.Queue(this, node.Handle, ev, arg); }
 
+        /// <summary>The live node of a handle, null for a bad or stale handle.</summary>
+        /// <param name="handle">The handle.</param>
         public UiNode Node(int handle)
         {
             int i = handle & IndexMask;
@@ -58,9 +68,12 @@ namespace Syntrix.Ui
 
         // ---------------------------------------------------------------- elements
 
+        /// <summary>Creates an element; returns its handle or 0.</summary>
+        /// <param name="kind">UiKind number.</param>
+        /// <param name="parent">Parent handle; 0 top level, -1 top level without resolution scaling.</param>
         public int Create(int kind, int parent)
         {
-            if (!_service.Ready || kind == (int)UiKind.Part || kind < 1 || kind > (int)UiKind.Slider)
+            if (!_service.Ready || !UiNode.IsCreatable(kind))
                 return 0;
             UiNode p = null;
             if (parent > 0)
@@ -69,11 +82,21 @@ namespace Syntrix.Ui
                 if (p == null)
                     return 0;
             }
-            if (Full)
+            if (!UiNode.CanAttach((UiKind)kind, p) || Full)
                 return 0;
             var n = new UiNode(this, NewHandle(), (UiKind)kind);
-            var e = UiNode.Make(n);
-            n.Init(e);
+            if (UiNode.IsTerminalKind(n.Kind))
+                n.InitTerminal();
+            else
+            {
+                var e = UiNode.Make(n);
+                if (p != null && p.Tree != null && !(e is LabelElementBase))
+                {
+                    _free.Push(n.Handle & IndexMask);
+                    return 0;
+                }
+                n.Init(e);
+            }
             _nodes[n.Handle & IndexMask] = n;
             Attach(n, p, parent);
             if (n.Window != null)
@@ -102,16 +125,33 @@ namespace Syntrix.Ui
         private void Attach(UiNode n, UiNode p, int parentHandle)
         {
             n.Parent = p;
+            if (n.Term != null)
+                n.AttachTerminal(p);
             if (p == null)
             {
-                n.Element.Register(parentHandle < 0 ? HudMain.Root : HudMain.HighDpiRoot);
+                if (n.Term == null)
+                    n.RootNode.Register(parentHandle < 0 ? HudMain.Root : HudMain.HighDpiRoot);
                 _roots.Add(n);
                 return;
             }
             if (p.Children == null)
                 p.Children = new List<UiNode>();
             p.Children.Add(n);
-            if (p.Scroll != null)
+            if (n.Term != null)
+                return;
+            if (n.Outer != null)
+                n.Outer.Register(p.ContentParent);
+            else if (p.Tree != null)
+            {
+                p.Tree.Add((LabelElementBase)n.Element, n.Handle.ToString());
+                n.InTree = true;
+            }
+            else if (p.Radial != null)
+            {
+                p.Radial.Add(n.Element);
+                n.InRadial = true;
+            }
+            else if (p.Scroll != null)
             {
                 p.Scroll.Add(n.Element);
                 n.Entry = p.Scroll.Collection[p.Scroll.Count - 1];
@@ -128,15 +168,34 @@ namespace Syntrix.Ui
         private void Detach(UiNode n)
         {
             var p = n.Parent;
+            if (n.Term != null)
+                n.DetachTerminal();
             if (p == null)
             {
                 _roots.Remove(n);
-                n.Element.Unregister();
+                if (n.Term == null)
+                    n.RootNode.Unregister();
                 return;
             }
             if (p.Children != null)
                 p.Children.Remove(n);
-            if (n.Entry != null && p.Scroll != null)
+            if (n.Term != null)
+            {
+                // terminal members stay in place, disabled
+            }
+            else if (n.Outer != null)
+                n.Outer.Unregister();
+            else if (n.InTree && p.Tree != null)
+            {
+                var e = n.Element;
+                p.Tree.Remove(c => c.Element == e);
+            }
+            else if (n.InRadial && p.Radial != null)
+            {
+                var e = n.Element;
+                p.Radial.Remove(c => c.Element == e);
+            }
+            else if (n.Entry != null && p.Scroll != null)
                 p.Scroll.Remove(n.Entry);
             else if (n.InChain && p.Chain != null)
             {
@@ -147,6 +206,8 @@ namespace Syntrix.Ui
                 n.Element.Unregister();
             n.Entry = null;
             n.InChain = false;
+            n.InTree = false;
+            n.InRadial = false;
             n.Parent = null;
         }
 
@@ -171,6 +232,8 @@ namespace Syntrix.Ui
             }
         }
 
+        /// <summary>Removes an element and its children (terminal members are disabled).</summary>
+        /// <param name="handle">The handle.</param>
         public void Remove(int handle)
         {
             var n = Node(handle);
@@ -181,32 +244,27 @@ namespace Syntrix.Ui
         }
 
         /// <summary>Removes all children the mod added to this element.</summary>
+        /// <param name="handle">The handle.</param>
         public void Clear(int handle)
         {
             var n = Node(handle);
             if (n == null || n.Children == null || n.Children.Count == 0)
                 return;
-            var list = n.Children.ToArray();
-            if (n.Scroll != null)
-                n.Scroll.Clear();
-            else if (n.Chain != null)
-                n.Chain.Clear();
-            foreach (var c in list)
+            foreach (var c in n.Children.ToArray())
             {
-                if (n.Scroll == null && n.Chain == null)
-                    c.Element.Unregister();
-                c.Parent = null;
-                c.Entry = null;
-                c.InChain = false;
+                Detach(c);
                 Free(c);
             }
             n.Children.Clear();
         }
 
+        /// <summary>Moves an element to another parent (not for terminal members, Rich HUD cannot move them).</summary>
+        /// <param name="handle">The handle.</param>
+        /// <param name="parent">New parent handle; 0 top level, -1 top level without resolution scaling.</param>
         public void SetParent(int handle, int parent)
         {
             var n = Node(handle);
-            if (n == null || n.Kind == UiKind.Part || handle == parent)
+            if (n == null || n.Kind == UiKind.Part || n.Term != null || handle == parent)
                 return;
             UiNode p = null;
             if (parent > 0)
@@ -218,11 +276,15 @@ namespace Syntrix.Ui
                     if (a == n)
                         return;
             }
+            if (!UiNode.CanAttach(n.Kind, p) || (p != null && p.Tree != null && !(n.Element is LabelElementBase)))
+                return;
             Detach(n);
             Attach(n, p, parent);
         }
 
         /// <summary>Handle of a fixed part (window header 1, body 2, border 3; panel or scroll box background 1).</summary>
+        /// <param name="handle">The handle.</param>
+        /// <param name="part">Part number.</param>
         public int Part(int handle, int part)
         {
             var n = Node(handle);
@@ -243,6 +305,10 @@ namespace Syntrix.Ui
             return pn.Handle;
         }
 
+        /// <summary>Switches an event of an element on or off.</summary>
+        /// <param name="handle">The handle.</param>
+        /// <param name="ev">UiEvent number.</param>
+        /// <param name="on">True to receive it.</param>
         public void Listen(int handle, int ev, bool on)
         {
             var n = Node(handle);
@@ -252,19 +318,98 @@ namespace Syntrix.Ui
 
         // Property access: a bad handle is ignored and reads as default. No allocations here.
 
+        /// <summary>Sets a bool property of an element.</summary>
         public void SetBool(int h, int p, bool v) { var n = Node(h); if (n != null) n.SetBool(p, v); }
+        /// <summary>Sets an int property of an element.</summary>
         public void SetInt(int h, int p, int v) { var n = Node(h); if (n != null) n.SetInt(p, v); }
+        /// <summary>Sets a float property of an element.</summary>
         public void SetFloat(int h, int p, float v) { var n = Node(h); if (n != null) n.SetFloat(p, v); }
+        /// <summary>Sets a Vector2 property of an element.</summary>
         public void SetVector(int h, int p, Vector2 v) { var n = Node(h); if (n != null) n.SetVector(p, v); }
+        /// <summary>Sets a Color property of an element.</summary>
         public void SetColor(int h, int p, Color v) { var n = Node(h); if (n != null) n.SetColor(p, v); }
+        /// <summary>Sets a string property of an element.</summary>
         public void SetText(int h, int p, string v) { var n = Node(h); if (n != null) n.SetText(p, v); }
+        /// <summary>Reads a bool property of an element.</summary>
         public bool GetBool(int h, int p) { var n = Node(h); return n != null && n.GetBool(p); }
+        /// <summary>Reads an int property of an element.</summary>
         public int GetInt(int h, int p) { var n = Node(h); return n != null ? n.GetInt(p) : 0; }
+        /// <summary>Reads a float property of an element.</summary>
         public float GetFloat(int h, int p) { var n = Node(h); return n != null ? n.GetFloat(p) : 0f; }
+        /// <summary>Reads a Vector2 property of an element.</summary>
         public Vector2 GetVector(int h, int p) { var n = Node(h); return n != null ? n.GetVector(p) : Vector2.Zero; }
+        /// <summary>Reads a Color property of an element.</summary>
         public Color GetColor(int h, int p) { var n = Node(h); return n != null ? n.GetColor(p) : Color.Transparent; }
+        /// <summary>Reads a string property of an element.</summary>
         public string GetText(int h, int p) { var n = Node(h); return n != null ? n.GetText(p) : null; }
+        /// <summary>Sets a Vector3D property of an element.</summary>
+        public void SetVector3(int h, int p, Vector3D v) { var n = Node(h); if (n != null) n.SetVector3(p, v); }
+        /// <summary>Reads a Vector3D property of an element.</summary>
+        public Vector3D GetVector3(int h, int p) { var n = Node(h); return n != null ? n.GetVector3(p) : Vector3D.Zero; }
 
+        /// <summary>World matrix of a world space element.</summary>
+        /// <param name="h">The handle.</param>
+        /// <param name="matrix">Plane to world matrix.</param>
+        public void SetMatrix(int h, MatrixD matrix) { var n = Node(h); if (n != null) n.SetMatrix(matrix); }
+
+        /// <summary>Points (and mesh triangle indices) of a shape element.</summary>
+        /// <param name="h">The handle.</param>
+        /// <param name="points">Points relative to the centre.</param>
+        /// <param name="indices">Mesh: three indices per triangle.</param>
+        public void SetPoints(int h, Vector2[] points, int[] indices)
+        {
+            var n = Node(h);
+            if (n != null && n.Shape != null)
+                n.Shape.SetPoints(points, indices);
+        }
+
+        // ---------------------------------------------------------------- list entries
+
+        /// <summary>Inserts a list entry; returns its index or -1.</summary>
+        /// <param name="h">The handle.</param>
+        /// <param name="index">Position; -1 appends.</param>
+        /// <param name="key">Key of the entry.</param>
+        /// <param name="markup">Text of the entry.</param>
+        public int ItemInsert(int h, int index, string key, string markup) { var n = Node(h); return n != null ? UiItemList.Insert(n, index, key, markup) : -1; }
+
+        /// <summary>Removes a list entry; -1 removes all.</summary>
+        /// <param name="h">The handle.</param>
+        /// <param name="index">Entry index or -1.</param>
+        public void ItemRemove(int h, int index) { var n = Node(h); if (n != null) UiItemList.Remove(n, index); }
+
+        /// <summary>Replaces the text of a list entry.</summary>
+        /// <param name="h">The handle.</param>
+        /// <param name="index">Entry index.</param>
+        /// <param name="markup">New text.</param>
+        public void ItemText(int h, int index, string markup) { var n = Node(h); if (n != null) UiItemList.SetText(n, index, markup); }
+
+        /// <summary>Shows or hides a list entry.</summary>
+        /// <param name="h">The handle.</param>
+        /// <param name="index">Entry index.</param>
+        /// <param name="enabled">True to show it.</param>
+        public void ItemEnabled(int h, int index, bool enabled) { var n = Node(h); if (n != null) UiItemList.SetEnabled(n, index, enabled); }
+
+        /// <summary>Key of a list entry, null outside the list.</summary>
+        /// <param name="h">The handle.</param>
+        /// <param name="index">Entry index.</param>
+        public string ItemKey(int h, int index) { var n = Node(h); return n != null ? UiItemList.Key(n, index) : null; }
+
+        /// <summary>Index of the first list entry with this key, -1 if none.</summary>
+        /// <param name="h">The handle.</param>
+        /// <param name="key">The key.</param>
+        public int ItemFind(int h, string key) { var n = Node(h); return n != null ? UiItemList.Find(n, key) : -1; }
+
+        /// <summary>Opens the Rich HUD terminal on a page of this mod.</summary>
+        /// <param name="h">Handle of a control page or text page.</param>
+        public void OpenTerminal(int h)
+        {
+            var n = Node(h);
+            if (n != null)
+                n.OpenTerminalPage();
+        }
+
+        /// <summary>Gives a shown window the focus.</summary>
+        /// <param name="handle">The window handle.</param>
         public void Focus(int handle)
         {
             var n = Node(handle);
@@ -272,6 +417,10 @@ namespace Syntrix.Ui
                 n.Window.GetWindowFocus();
         }
 
+        /// <summary>Size of a text in the base format of an element.</summary>
+        /// <param name="handle">Element whose format is used; 0 for the default.</param>
+        /// <param name="markup">Text with markup.</param>
+        /// <param name="wrapWidth">Wrap width; 0 = no wrapping.</param>
         public Vector2 Measure(int handle, string markup, float wrapWidth)
         {
             var n = Node(handle);
@@ -325,6 +474,8 @@ namespace Syntrix.Ui
         // ---------------------------------------------------------------- key binds
 
         /// <summary>Registers or changes the default of a bind; applied as soon as Rich HUD is ready.</summary>
+        /// <param name="name">Bind name.</param>
+        /// <param name="keys">Keys joined with '+'.</param>
         public void Bind(string name, string keys)
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -342,12 +493,16 @@ namespace Syntrix.Ui
             _service.WantPages();
         }
 
+        /// <summary>Asks for the rebind page in the Rich HUD terminal.</summary>
+        /// <param name="title">Page title; empty uses the mod name.</param>
         public void BindPage(string title)
         {
             _pageTitle = string.IsNullOrWhiteSpace(title) ? ModName : title;
             _service.WantPages();
         }
 
+        /// <summary>Current keys of a bind ("Ctrl+K"), null if unknown.</summary>
+        /// <param name="name">Bind name.</param>
         public string BindKeys(string name)
         {
             if (_group == null || name == null)
@@ -438,6 +593,7 @@ namespace Syntrix.Ui
             RichHudTerminal.Root.Add(page);
         }
 
+        /// <summary>Saves the player's binds of this mod.</summary>
         public void SaveBinds()
         {
             if (_group == null || _bindNames.Count == 0)

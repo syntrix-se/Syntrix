@@ -12,20 +12,28 @@ namespace Syntrix.Ui
     /// Properties are dispatched by the element's type, so a property works on every element that has it.
     /// Set calls do not allocate except for texts and textures.
     /// </summary>
-    public sealed class UiNode
+    public sealed partial class UiNode
     {
+        /// <summary>The mod's UI state this node belongs to.</summary>
         public readonly UiClient Client;
+        /// <summary>Handle of the node (index plus generation).</summary>
         public readonly int Handle;
+        /// <summary>Kind of the node.</summary>
         public readonly UiKind Kind;
 
+        /// <summary>The Rich HUD element; null for terminal nodes.</summary>
         public HudElementBase Element;
+        /// <summary>Parent node, null at the top level.</summary>
         public UiNode Parent;
+        /// <summary>Children the mod added, null until the first.</summary>
         public List<UiNode> Children;
         /// <summary>Entry in the parent's scroll box, null otherwise.</summary>
         public ScrollBoxEntry Entry;
         /// <summary>Member of the parent's chain.</summary>
         public bool InChain;
+        /// <summary>The node was removed; its handle is free.</summary>
         public bool Dead;
+        /// <summary>Fixed part nodes (window header, body, border; background), made on request.</summary>
         public UiNode[] Parts;
         /// <summary>Bit per UiEvent the mod listens to.</summary>
         public int Listened;
@@ -33,19 +41,34 @@ namespace Syntrix.Ui
         public Dictionary<uint, string> Links;
 
         // Typed views of Element (null where the element is no such type)
+
+        /// <summary>Textured box.</summary>
         public TexturedBox Box;
+        /// <summary>Border.</summary>
         public BorderBox Border;
+        /// <summary>Syntrix label.</summary>
         public LabelElement Label;
+        /// <summary>Label box.</summary>
         public LabelBox LabelBox;
+        /// <summary>Any label box (label box, button, bordered button, double label box).</summary>
         public LabelBoxBase LabelBase;
+        /// <summary>Button.</summary>
         public LabelBoxButton Button;
+        /// <summary>Panel.</summary>
         public PanelElement Panel;
+        /// <summary>Text field.</summary>
         public TextFieldElement Field;
+        /// <summary>Scroll box.</summary>
         public ScrollBox Scroll;
+        /// <summary>Chain.</summary>
         public HudChain Chain;
+        /// <summary>Click area.</summary>
         public MouseInputElement Click;
+        /// <summary>Window.</summary>
         public WindowElement Window;
+        /// <summary>Check box.</summary>
         public BorderedCheckBox Check;
+        /// <summary>Slider.</summary>
         public SliderBox Slider;
         private ITextBuilder _text;
         private ITextBoard _board;
@@ -61,6 +84,10 @@ namespace Syntrix.Ui
         private string _texture;
         private Vector2 _texSize, _texOffset, _texRegion;
 
+        /// <summary>Makes a node; Init (or InitTerminal) follows.</summary>
+        /// <param name="client">The mod's UI state.</param>
+        /// <param name="handle">Handle of the node.</param>
+        /// <param name="kind">Kind of the node.</param>
         public UiNode(UiClient client, int handle, UiKind kind)
         {
             Client = client;
@@ -69,7 +96,8 @@ namespace Syntrix.Ui
             _style = new UiMarkup.Style { Color = Color.White, Size = 1f, Font = -1, Align = TextAlignment.Left };
         }
 
-        /// <summary>Makes the Rich HUD element for this node's kind; null for Part.</summary>
+        /// <summary>Makes the Rich HUD element for this node's kind; null for Part and terminal kinds.</summary>
+        /// <param name="n">The node.</param>
         public static HudElementBase Make(UiNode n)
         {
             switch (n.Kind)
@@ -99,10 +127,11 @@ namespace Syntrix.Ui
                 case UiKind.CheckBox: return new BorderedCheckBox();
                 case UiKind.Slider: return new SliderBox { Size = new Vector2(240f, 30f) };
             }
-            return null;
+            return MakeControl(n);
         }
 
         /// <summary>Takes the element and wires its events. Called once.</summary>
+        /// <param name="e">The Rich HUD element.</param>
         public void Init(HudElementBase e)
         {
             Element = e;
@@ -137,7 +166,8 @@ namespace Syntrix.Ui
                 _text = Window.HeaderBuilder;
             else if (e is WindowBase)
                 _text = ((WindowBase)e).HeaderBuilder;
-            if (_text != null && Kind != UiKind.Part)
+            InitControls(e);
+            if ((_text != null || _textSink != null) && Kind != UiKind.Part)
                 RenderText();
 
             IMouseInput mouse = null;
@@ -163,12 +193,18 @@ namespace Syntrix.Ui
         /// <summary>Where children of this node are registered.</summary>
         public HudParentBase ContentParent { get { return Window != null ? Window.body : Element; } }
 
+        /// <summary>Queues an event for the mod if it listens to it.</summary>
+        /// <param name="ev">The event.</param>
+        /// <param name="arg">Argument or null.</param>
         public void Fire(UiEvent ev, string arg)
         {
             if (!Dead && ((Listened >> (int)ev) & 1) != 0)
                 Client.Queue(this, (int)ev, arg);
         }
 
+        /// <summary>Switches an event on or off for this node.</summary>
+        /// <param name="ev">UiEvent number.</param>
+        /// <param name="on">True to receive it.</param>
         public void Listen(int ev, bool on)
         {
             if (ev <= 0 || ev >= 31)
@@ -196,7 +232,7 @@ namespace Syntrix.Ui
                 if (Click != null) return Click;
                 if (Field != null) return Field.MouseInput;
                 if (Slider != null) return Slider.MouseInput;
-                return null;
+                return ControlMouse;
             }
         }
 
@@ -213,6 +249,7 @@ namespace Syntrix.Ui
         // ---------------------------------------------------------------- parts
 
         /// <summary>Window: 1 header, 2 body, 3 border. Panel and scroll box: 1 background.</summary>
+        /// <param name="part">Part number.</param>
         public HudElementBase PartElement(int part)
         {
             if (Window != null)
@@ -238,8 +275,13 @@ namespace Syntrix.Ui
                 RenderPlaceholder();
                 return;
             }
+            ApplyFormat(format);
             if (_text == null)
+            {
+                if (_textSink != null)
+                    _textSink(_plain || string.IsNullOrEmpty(_markup) ? new RichText(_markup ?? "", format) : UiMarkup.Parse(_markup, _style, _linkColor, null));
                 return;
+            }
             _text.Format = format;
             if (_plain || string.IsNullOrEmpty(_markup))
                 _text.SetText(_markup ?? "", format);
@@ -282,12 +324,21 @@ namespace Syntrix.Ui
                 Panel.Background.Material = m;
             else if (Border != null)
                 Border.Material = m;
+            else if (Shape != null)
+                Shape.Material = m;
+            else if (Icon != null)
+                Icon.Material = m;
         }
 
         // ---------------------------------------------------------------- Vector2
 
+        /// <summary>Sets a Vector2 property.</summary>
+        /// <param name="p">UiProperty number.</param>
+        /// <param name="v">New value.</param>
         public void SetVector(int p, Vector2 v)
         {
+            if (SetVectorControls(p, v))
+                return;
             switch ((UiProperty)p)
             {
                 case UiProperty.Offset: Element.Offset = v; break;
@@ -309,8 +360,13 @@ namespace Syntrix.Ui
             }
         }
 
+        /// <summary>Reads a Vector2 property.</summary>
+        /// <param name="p">UiProperty number.</param>
         public Vector2 GetVector(int p)
         {
+            Vector2 hv;
+            if (GetVectorControls(p, out hv))
+                return hv;
             switch ((UiProperty)p)
             {
                 case UiProperty.Offset: return Element.Offset;
@@ -334,8 +390,13 @@ namespace Syntrix.Ui
 
         // ---------------------------------------------------------------- float
 
+        /// <summary>Sets a float property.</summary>
+        /// <param name="p">UiProperty number.</param>
+        /// <param name="v">New value.</param>
         public void SetFloat(int p, float v)
         {
+            if (SetFloatControls(p, v))
+                return;
             switch ((UiProperty)p)
             {
                 case UiProperty.Width: Element.Width = v; break;
@@ -372,8 +433,13 @@ namespace Syntrix.Ui
             }
         }
 
+        /// <summary>Reads a float property.</summary>
+        /// <param name="p">UiProperty number.</param>
         public float GetFloat(int p)
         {
+            float hv;
+            if (GetFloatControls(p, out hv))
+                return hv;
             switch ((UiProperty)p)
             {
                 case UiProperty.Width: return Element.Width;
@@ -399,8 +465,13 @@ namespace Syntrix.Ui
 
         // ---------------------------------------------------------------- bool
 
+        /// <summary>Sets a bool property.</summary>
+        /// <param name="p">UiProperty number.</param>
+        /// <param name="v">New value.</param>
         public void SetBool(int p, bool v)
         {
+            if (SetBoolControls(p, v))
+                return;
             switch ((UiProperty)p)
             {
                 case UiProperty.Visible:
@@ -451,8 +522,13 @@ namespace Syntrix.Ui
             }
         }
 
+        /// <summary>Reads a bool property.</summary>
+        /// <param name="p">UiProperty number.</param>
         public bool GetBool(int p)
         {
+            bool hv;
+            if (GetBoolControls(p, out hv))
+                return hv;
             switch ((UiProperty)p)
             {
                 case UiProperty.Visible: return Element.Visible;
@@ -482,8 +558,13 @@ namespace Syntrix.Ui
 
         // ---------------------------------------------------------------- int
 
+        /// <summary>Sets an int property.</summary>
+        /// <param name="p">UiProperty number.</param>
+        /// <param name="v">New value.</param>
         public void SetInt(int p, int v)
         {
+            if (SetIntControls(p, v))
+                return;
             switch ((UiProperty)p)
             {
                 case UiProperty.ParentAlign: Element.ParentAlignment = (ParentAlignments)v; break;
@@ -510,8 +591,13 @@ namespace Syntrix.Ui
             }
         }
 
+        /// <summary>Reads an int property.</summary>
+        /// <param name="p">UiProperty number.</param>
         public int GetInt(int p)
         {
+            int hv;
+            if (GetIntControls(p, out hv))
+                return hv;
             switch ((UiProperty)p)
             {
                 case UiProperty.ParentAlign: return (int)Element.ParentAlignment;
@@ -533,8 +619,13 @@ namespace Syntrix.Ui
 
         // ---------------------------------------------------------------- Color
 
+        /// <summary>Sets a Color property.</summary>
+        /// <param name="p">UiProperty number.</param>
+        /// <param name="v">New value.</param>
         public void SetColor(int p, Color v)
         {
+            if (SetColorControls(p, v))
+                return;
             switch ((UiProperty)p)
             {
                 case UiProperty.Color:
@@ -596,8 +687,13 @@ namespace Syntrix.Ui
             }
         }
 
+        /// <summary>Reads a Color property.</summary>
+        /// <param name="p">UiProperty number.</param>
         public Color GetColor(int p)
         {
+            Color hv;
+            if (GetColorControls(p, out hv))
+                return hv;
             switch ((UiProperty)p)
             {
                 case UiProperty.Color:
@@ -622,8 +718,13 @@ namespace Syntrix.Ui
 
         // ---------------------------------------------------------------- string
 
+        /// <summary>Sets a string property.</summary>
+        /// <param name="p">UiProperty number.</param>
+        /// <param name="v">New value.</param>
         public void SetText(int p, string v)
         {
+            if (SetTextControls(p, v))
+                return;
             switch ((UiProperty)p)
             {
                 case UiProperty.Text:
@@ -656,16 +757,16 @@ namespace Syntrix.Ui
                         RenderPlaceholder();
                     }
                     break;
-                case UiProperty.Tooltip:
-                    var m = Mouse;
-                    if (m != null)
-                        m.ToolTip = string.IsNullOrEmpty(v) ? null : new ToolTip { text = UiMarkup.Parse(v, new UiMarkup.Style { Color = new Color(220, 235, 242), Size = 0.75f, Font = -1 }, _linkColor, null) };
-                    break;
             }
         }
 
+        /// <summary>Reads a string property.</summary>
+        /// <param name="p">UiProperty number.</param>
         public string GetText(int p)
         {
+            string hv;
+            if (GetTextControls(p, out hv))
+                return hv;
             switch ((UiProperty)p)
             {
                 case UiProperty.Text:

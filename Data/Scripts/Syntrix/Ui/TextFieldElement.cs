@@ -27,6 +27,7 @@ namespace Syntrix.Ui
         /// <summary>Longest text; zero = no limit.</summary>
         public int MaxLength;
 
+        /// <summary>Makes the text field of a node.</summary>
         public TextFieldElement(UiNode node) : base(null)
         {
             _node = node;
@@ -68,6 +69,7 @@ namespace Syntrix.Ui
             }
         }
 
+        /// <summary>Starts typing on a click inside, stops on a click outside, Enter (Submit) or Escape.</summary>
         protected override void HandleInput(Vector2 cursorPos)
         {
             base.HandleInput(cursorPos);
@@ -117,6 +119,7 @@ namespace Syntrix.Ui
             _node.Fire(UiEvent.TextChanged, now);
         }
 
+        /// <summary>Shows the placeholder while the field is empty and not typed in.</summary>
         protected override void Layout()
         {
             base.Layout();

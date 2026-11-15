@@ -11,14 +11,19 @@ namespace Syntrix.Ui
         private readonly UiNode _node;
         private Vector2 _lastBody;
 
+        /// <summary>Escape closes the focused window.</summary>
         public bool CloseOnEscape = true;
+        /// <summary>Hide the game HUD while open.</summary>
         public bool HideHud;
+        /// <summary>Keep the view still while open.</summary>
         public bool LockView = true;
+        /// <summary>Cursor on, mouse and camera kept from the game while open.</summary>
         public bool Modal = true;
 
         /// <summary>Last known visibility, for the Closed event.</summary>
         public bool WasVisible;
 
+        /// <summary>Makes the window of a node.</summary>
         public WindowElement(UiNode node) : base(null)
         {
             _node = node;
@@ -31,6 +36,7 @@ namespace Syntrix.Ui
             Visible = false;
         }
 
+        /// <summary>Raises Resized when the body size changed.</summary>
         protected override void Layout()
         {
             base.Layout();
@@ -42,6 +48,7 @@ namespace Syntrix.Ui
             }
         }
 
+        /// <summary>Escape hides the focused window.</summary>
         protected override void HandleInput(Vector2 cursorPos)
         {
             base.HandleInput(cursorPos);

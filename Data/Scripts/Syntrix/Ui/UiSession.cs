@@ -13,6 +13,7 @@ namespace Syntrix.Ui
         private int _errors;
         private bool _failed;
 
+        /// <summary>Runs the UI service update.</summary>
         public override void UpdateAfterSimulation()
         {
             var s = UiService.Instance;
@@ -22,6 +23,7 @@ namespace Syntrix.Ui
             catch (Exception e) { Fail("update", e); }
         }
 
+        /// <summary>Runs the UI service input handling.</summary>
         public override void HandleInput()
         {
             var s = UiService.Instance;
@@ -31,6 +33,7 @@ namespace Syntrix.Ui
             catch (Exception e) { Fail("input", e); }
         }
 
+        /// <summary>Runs the UI service frame: sends the queued events and makes the rebind pages.</summary>
         public override void Draw()
         {
             var s = UiService.Instance;
