@@ -122,7 +122,8 @@ namespace Syntrix.Ui
                 case UiKind.Chain:
                 case UiKind.ChainHorizontal:
                     return new HudChain(n.Kind == UiKind.Chain) { SizingMode = HudChainSizingModes.FitChainBoth };
-                case UiKind.ClickArea: return new MouseInputElement { Size = new Vector2(32f, 32f) };
+                // Rich HUD stretches a mouse input to its parent; a click area keeps its own size (DimAlign Size fills)
+                case UiKind.ClickArea: return new MouseInputElement { DimAlignment = DimAlignments.None, Size = new Vector2(32f, 32f) };
                 case UiKind.Window: return new WindowElement(n);
                 case UiKind.CheckBox: return new BorderedCheckBox();
                 case UiKind.Slider: return new SliderBox { Size = new Vector2(240f, 30f) };
