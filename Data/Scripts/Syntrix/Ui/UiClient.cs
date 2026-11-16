@@ -541,7 +541,7 @@ namespace Syntrix.Ui
             IBind bind = _group.GetBind(name);
             if (bind == null)
             {
-                if (!_group.TryRegisterBind(name, out bind, combo))
+                if (!_group.TryRegisterBind(name, out bind, combo, NoAliases))
                     bind = _group.GetBind(name);
                 if (bind == null)
                     return;
@@ -558,6 +558,9 @@ namespace Syntrix.Ui
                     if (d.name == name && d.controlNames != null)
                         bind.TrySetCombo(d.controlNames, 0, false, true);
         }
+
+        // Rich HUD reads aliases.Count without a null check, so an empty list is passed.
+        private static readonly List<IReadOnlyList<ControlHandle>> NoAliases = new List<IReadOnlyList<ControlHandle>>();
 
         private static List<ControlHandle> Combo(string keys)
         {
