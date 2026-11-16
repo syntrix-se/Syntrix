@@ -965,7 +965,7 @@ namespace Syntrix.Api
         /// <param name="parent">Parent element; null = Root.</param>
         public UiElement Empty(UiElement parent) { return new UiElement(this, Create(UiKind.Empty, parent)); }
 
-        /// <summary>Invisible element with mouse events.</summary>
+        /// <summary>Invisible element with mouse events. It keeps its own Size; DimAlign Size fills the parent.</summary>
         /// <param name="parent">Parent element; null = Root.</param>
         public UiElement ClickArea(UiElement parent) { return new UiElement(this, Create(UiKind.ClickArea, parent)); }
 
