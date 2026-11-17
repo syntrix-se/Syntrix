@@ -16,27 +16,36 @@ namespace Syntrix
     /// </summary>
     public class ChatCommands
     {
-        class Entry
+        private class Entry
         {
+            /// <summary>Mod that registered the command.</summary>
             public string Mod;
+            /// <summary>Command word without the slash.</summary>
             public string Command;
+            /// <summary>Lowest promote level that may run it.</summary>
             public MyPromoteLevel Level;
+            /// <summary>Runs on the server instead of the player.</summary>
             public bool OnServer;
+            /// <summary>Help text.</summary>
             public string Help;
+            /// <summary>Handler: sender, arguments, answer.</summary>
             public Func<ulong, string[], string> Handler;
         }
 
-        readonly SyntrixCore _core;
-        readonly Dictionary<string, Entry> _commands = new Dictionary<string, Entry>(StringComparer.OrdinalIgnoreCase);
+        private readonly SyntrixCore _core;
+        private readonly Dictionary<string, Entry> _commands = new Dictionary<string, Entry>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>Makes the chat command service.</summary>
         public ChatCommands(SyntrixCore core) { _core = core; }
 
+        /// <summary>Starts listening to the chat.</summary>
         public void Start()
         {
             if (_core.IsPlayer)
                 MyAPIGateway.Utilities.MessageEnteredSender += OnMessageEntered;
         }
 
+        /// <summary>Stops listening and forgets all commands.</summary>
         public void Stop()
         {
             if (_core.IsPlayer)
@@ -44,6 +53,7 @@ namespace Syntrix
             _commands.Clear();
         }
 
+        /// <summary>Registers a chat command of a mod.</summary>
         public void Register(string mod, string command, int level, bool onServer, string help, Func<ulong, string[], string> handler)
         {
             if (string.IsNullOrWhiteSpace(command) || handler == null)
@@ -64,7 +74,18 @@ namespace Syntrix
             };
         }
 
-        void OnMessageEntered(ulong sender, string text, ref bool sendToOthers)
+        /// <summary>API 2: removes a command, only by the mod that registered it.</summary>
+        public void Unregister(string mod, string command)
+        {
+            if (string.IsNullOrWhiteSpace(command))
+                return;
+            command = command.Trim().TrimStart('/');
+            Entry e;
+            if (_commands.TryGetValue(command, out e) && e.Mod == mod)
+                _commands.Remove(command);
+        }
+
+        private void OnMessageEntered(ulong sender, string text, ref bool sendToOthers)
         {
             if (string.IsNullOrEmpty(text) || text[0] != '/')
                 return;
@@ -99,6 +120,7 @@ namespace Syntrix
             _core.Net.ToServer(new Packet { Kind = PacketKind.ChatRun, Channel = e.Command, Texts = args });
         }
 
+        /// <summary>Handles a chat packet from the network.</summary>
         public void OnPacket(Packet p, ulong sender)
         {
             if (p.Kind == PacketKind.ChatRun)
@@ -122,7 +144,7 @@ namespace Syntrix
             }
         }
 
-        void Run(Entry e, ulong sender, string[] args, ulong? replyTo)
+        private void Run(Entry e, ulong sender, string[] args, ulong? replyTo)
         {
             string reply;
             try { reply = e.Handler(sender, args); }
@@ -139,18 +161,18 @@ namespace Syntrix
                 Show(e.Mod, reply);
         }
 
-        void Reply(ulong steamId, string from, string text)
+        private void Reply(ulong steamId, string from, string text)
         {
             _core.Net.ToPlayer(new Packet { Kind = PacketKind.ChatReply, Texts = new[] { from, text } }, steamId);
         }
 
-        static void Show(string from, string text)
+        private static void Show(string from, string text)
         {
             foreach (var line in text.Split('\n'))
                 MyAPIGateway.Utilities.ShowMessage(from, line.TrimEnd('\r'));
         }
 
-        void ShowHelp()
+        private void ShowHelp()
         {
             var sb = new StringBuilder();
             sb.Append("Syntrix ").Append(Protocol.VersionText).Append(", docked: ");
