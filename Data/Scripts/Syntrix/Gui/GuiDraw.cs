@@ -72,9 +72,6 @@ namespace Syntrix.Gui
                 {
                     ok = false;
                 }
-                // Raw texture paths are not materials but draw fine
-                if (!ok && name.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
-                    ok = true;
                 Available[name] = ok;
             }
             return ok;
@@ -170,15 +167,15 @@ namespace Syntrix.Gui
                 return;
             }
             float x1 = r.X + k, x2 = r.X + r.Width - k, y1 = r.Y + k, y2 = r.Y + r.Height - k;
-            Texture(prefix + "_left_top.dds", new RectangleF(r.X, r.Y, k, k), c);
-            Texture(prefix + "_center_top.dds", new RectangleF(x1, r.Y, x2 - x1, k), c);
-            Texture(prefix + "_right_top.dds", new RectangleF(x2, r.Y, k, k), c);
-            Texture(prefix + "_left_center.dds", new RectangleF(r.X, y1, k, y2 - y1), c);
+            Texture(prefix + "_left_top", new RectangleF(r.X, r.Y, k, k), c);
+            Texture(prefix + "_center_top", new RectangleF(x1, r.Y, x2 - x1, k), c);
+            Texture(prefix + "_right_top", new RectangleF(x2, r.Y, k, k), c);
+            Texture(prefix + "_left_center", new RectangleF(r.X, y1, k, y2 - y1), c);
             Texture(center, new RectangleF(x1, y1, x2 - x1, y2 - y1), c);
-            Texture(prefix + "_right_center.dds", new RectangleF(x2, y1, k, y2 - y1), c);
-            Texture(prefix + "_left_bottom.dds", new RectangleF(r.X, y2, k, k), c);
-            Texture(prefix + "_center_bottom.dds", new RectangleF(x1, y2, x2 - x1, k), c);
-            Texture(prefix + "_right_bottom.dds", new RectangleF(x2, y2, k, k), c);
+            Texture(prefix + "_right_center", new RectangleF(x2, y1, k, y2 - y1), c);
+            Texture(prefix + "_left_bottom", new RectangleF(r.X, y2, k, k), c);
+            Texture(prefix + "_center_bottom", new RectangleF(x1, y2, x2 - x1, k), c);
+            Texture(prefix + "_right_bottom", new RectangleF(x2, y2, k, k), c);
         }
 
         /// <summary>Vanilla three-part texture (left, centre, right) with end parts of the given width in reference pixels.</summary>

@@ -9,6 +9,7 @@ using VRage.Game.Components;
 using VRage.Game.ModAPI;
 using Syntrix.Gui;
 using Syntrix.Use;
+using Syntrix.Wiki;
 using VRage.Utils;
 using VRageMath;
 
@@ -48,6 +49,9 @@ namespace Syntrix
         /// <summary>F action service.</summary>
         public UseService Use;
 
+        /// <summary>In-game wiki (API 3).</summary>
+        public WikiService Wiki;
+
         private readonly Dictionary<string, int> _docked = new Dictionary<string, int>();
         private string _instanceKey;
 
@@ -82,10 +86,12 @@ namespace Syntrix
             Settings = new SettingsService(this);
             Gui = new GuiService(this);
             Use = new UseService();
+            Wiki = new WikiService(this);
             Net.Start();
             Blocks.Start();
             Chat.Start();
             Settings.Start();
+            Wiki.Start();
             Started = true;
 
             Log.Info("Syntrix " + Protocol.VersionText + " (API " + Protocol.ApiVersion + ") started, " + (IsServer ? "server" : "client") + (IsPlayer ? " with player" : ""));
@@ -99,6 +105,7 @@ namespace Syntrix
             if (Started)
             {
                 MyAPIGateway.Utilities.SendModMessage(Protocol.ApiChannel, new MyTuple<string, int>(Protocol.TagBye, Protocol.ApiVersion));
+                Wiki.Stop();
                 Gui.Stop();
                 Use.Stop();
                 Settings.Stop();
@@ -282,6 +289,16 @@ namespace Syntrix
             // API 3: own F action for blocks (UseObjectTypeOverride "syntrix")
             d["Use.Register"] = new Action<string, string, Action<long, int>>((block, hint, h) => Use.Register(modName, block, hint, h));
             d["Use.Unregister"] = new Action<string>(block => Use.Unregister(modName, block));
+
+            // Wiki (API 3)
+            d["Wiki.Open"] = new Func<string, bool>(Wiki.Open);
+            d["Wiki.Close"] = new Action(Wiki.Close);
+            d["Wiki.IsOpen"] = new Func<bool>(() => Wiki.IsOpen);
+            d["Wiki.OnClosed"] = new Action<Action>(h => Wiki.OnClosed(modName, h));
+            d["Wiki.AddSource"] = new Action<Func<string, string>>(f => Wiki.AddSource(modName, f));
+            d["Wiki.AddTables"] = new Action<Func<string, string, string, string, string, string>>(f => Wiki.AddTables(modName, f));
+            d["Wiki.Context"] = new Func<string>(Wiki.Context);
+            d["Wiki.Reload"] = new Action(Wiki.Reload);
 
             return d;
         }

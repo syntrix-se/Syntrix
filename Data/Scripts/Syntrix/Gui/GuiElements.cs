@@ -26,11 +26,30 @@ namespace Syntrix.Gui
             float inner = Math.Max(0f, (Horizontal ? height - ph : width - pw));
             float sum = 0f, max = 0f;
             int n = 0;
+            // Horizontal: children with FillWidth share what the others leave of the available width
+            float share = 0f;
+            if (Horizontal)
+            {
+                float used = 0f;
+                int fill = 0, count = 0;
+                foreach (var c in Children)
+                {
+                    if (!c.Visible)
+                        continue;
+                    count++;
+                    if (c.FillWidth)
+                        fill++;
+                    else
+                        used += c.ResolveSize(0f, inner).X;
+                }
+                used += Math.Max(0, count - 1) * Spacing * K;
+                share = fill > 0 ? Math.Max(0f, (width - pw - used) / fill) : 0f;
+            }
             foreach (var c in Children)
             {
                 if (!c.Visible)
                     continue;
-                var s = Horizontal ? c.ResolveSize(0f, inner) : c.ResolveSize(inner, 0f);
+                var s = Horizontal ? (c.FillWidth ? new Vector2(share, c.ResolveSize(share, inner).Y) : c.ResolveSize(0f, inner)) : c.ResolveSize(inner, 0f);
                 sum += Horizontal ? s.X : s.Y;
                 max = Math.Max(max, Horizontal ? s.Y : s.X);
                 n++;
@@ -44,12 +63,27 @@ namespace Syntrix.Gui
             float gap = Spacing * K;
             if (!Horizontal)
             {
+                // Fixed and measured children first, the rest of the height goes to children with FillHeight
+                float usedH = 0f;
+                int fillH = 0, count = 0;
+                foreach (var c in Children)
+                {
+                    if (!c.Visible)
+                        continue;
+                    count++;
+                    if (c.FillHeight)
+                        fillH++;
+                    else
+                        usedH += c.ResolveSize(content.Width, 0f).Y;
+                }
+                usedH += Math.Max(0, count - 1) * gap;
+                float shareH = fillH > 0 ? Math.Max(0f, (content.Height - usedH) / fillH) : 0f;
                 float y = content.Y;
                 foreach (var c in Children)
                 {
                     if (!c.Visible)
                         continue;
-                    var s = c.ResolveSize(content.Width, 0f);
+                    var s = c.FillHeight ? new Vector2(c.ResolveSize(content.Width, shareH).X, shareH) : c.ResolveSize(content.Width, 0f);
                     float w = c.FillWidth || c.Size.X <= 0f && !(c is GuiButton) ? content.Width : s.X;
                     int hx = c.Anchor % 3;
                     float x = content.X + hx * (content.Width - w) / 2f + c.Offset.X * K;
@@ -407,7 +441,7 @@ namespace Syntrix.Gui
     }
 
     /// <summary>
-    /// Image or icon: TransparentMaterial, texture path (…\.dds) or definition id ("MyObjectBuilder_Ore/Iron");
+    /// Image or icon: TransparentMaterial, GUI or LCD texture name, or definition id ("MyObjectBuilder_Ore/Iron");
     /// several materials separated by ';' are drawn on top of each other. Keeps the aspect ratio unless Style is 1.
     /// </summary>
     public class GuiImage : GuiElement

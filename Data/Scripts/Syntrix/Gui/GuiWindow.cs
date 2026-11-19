@@ -28,6 +28,9 @@ namespace Syntrix.Gui
         /// <summary>Open drop-down list, drawn above everything and served first.</summary>
         public GuiDropdown Popup;
 
+        /// <summary>Syntrix' own windows: run every frame while the window has the focus (keys such as F11 to close).</summary>
+        public Action KeyHook;
+
         private Screen _screen;
         private bool _layoutValid;
         private Vector2 _laidFor;
@@ -245,6 +248,8 @@ namespace Syntrix.Gui
             _hasCursor = HasFocus && MyScreenSpace.TryGetCursorPositionPixels(out _cursor);
             try
             {
+                if (KeyHook != null && HasFocus)
+                    KeyHook();
                 if (Focus != null)
                     Focus.Keyboard();
                 if (!_hasCursor)
