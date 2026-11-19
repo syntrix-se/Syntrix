@@ -2,8 +2,8 @@
 // Do not edit it; take a newer copy from the Syntrix repository instead.
 // Windows and screen elements: also copy SyntrixGui.cs (optional dock file of the window service).
 //
-// This file deliberately holds several types (SyntrixApi, SyntrixFiles, SyntrixText, SyntrixLog,
-// SyntrixSliderScale, SyntrixControls) so that a mod copies exactly one file.
+// This file deliberately holds several types (SyntrixApi, SyntrixFiles, SyntrixText, SyntrixWikiXml,
+// SyntrixLog, SyntrixSliderScale, SyntrixControls) so that a mod copies exactly one file.
 //
 // MIT License - Copyright (c) 2026 Syntrix contributors
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this
@@ -724,6 +724,136 @@ namespace Syntrix.Api
         /// <summary>String id of a key (for terminal titles and tooltips).</summary>
         /// <param name="key">Text key.</param>
         public static MyStringId Id(string key) { return MyStringId.GetOrCompute(key); }
+    }
+
+    /// <summary>
+    /// Writes wiki XML for <see cref="SyntrixApi.WikiAddSource"/> (pages) and <see cref="SyntrixApi.WikiAddTables"/>
+    /// (one table or list): text is escaped, table cells are joined with "|" (links [[page|text]] stay whole).
+    /// Example for a table: <c>new SyntrixWikiXml().Page("_").Table("2|3").Header(de, en).Row(de, en).ToString()</c>.
+    /// </summary>
+    public class SyntrixWikiXml
+    {
+        private readonly StringBuilder _sb = new StringBuilder("<SyxWiki>");
+        private bool _page, _table, _list;
+
+        /// <summary>Starts a page (ends the open one). For WikiAddTables use the id "_".</summary>
+        /// <param name="id">Page id.</param>
+        /// <param name="parent">Parent page id, null = top.</param>
+        /// <param name="order">Order among the siblings.</param>
+        /// <param name="titleDe">German title.</param>
+        /// <param name="titleEn">English title.</param>
+        /// <param name="source">Mod name shown as the source, null = the mod that returned the XML.</param>
+        /// <param name="icons">Icons next to the title (material names or definition ids, separated by ';').</param>
+        public SyntrixWikiXml Page(string id, string parent = null, int order = 0, string titleDe = null, string titleEn = null, string source = null, string icons = null)
+        {
+            EndPage();
+            _sb.Append("<Page").Append(Attr("Id", id)).Append(Attr("Parent", parent)).Append(Attr("Order", order.ToString()))
+               .Append(Attr("Source", source)).Append(Attr("Icons", icons)).Append('>');
+            if (titleDe != null || titleEn != null)
+                _sb.Append("<Title").Append(Attr("de", titleDe)).Append(Attr("en", titleEn)).Append(" />");
+            _page = true;
+            return this;
+        }
+
+        /// <summary>Heading on the open page.</summary>
+        public SyntrixWikiXml Heading(string de, string en) { EndBlock(); _sb.Append("<Heading").Append(Attr("de", de)).Append(Attr("en", en)).Append(" />"); return this; }
+
+        /// <summary>Text on the open page (blank lines separate paragraphs, "- " starts a bullet).</summary>
+        public SyntrixWikiXml Text(string de, string en) { return Long("Text", de, en); }
+
+        /// <summary>Note box on the open page.</summary>
+        public SyntrixWikiXml Note(string de, string en) { return Long("Note", de, en); }
+
+        /// <summary>Starts a table on the open page.</summary>
+        /// <param name="widths">Relative column widths "2|1|3", null = equal.</param>
+        public SyntrixWikiXml Table(string widths = null) { EndBlock(); _sb.Append("<Table").Append(Attr("Widths", widths)).Append('>'); _table = true; return this; }
+
+        /// <summary>Header of the open table.</summary>
+        public SyntrixWikiXml Header(string[] de, string[] en) { _sb.Append("<Header").Append(Attr("de", Cells(de))).Append(Attr("en", Cells(en))).Append(" />"); return this; }
+
+        /// <summary>Row of the open table.</summary>
+        public SyntrixWikiXml Row(string[] de, string[] en) { _sb.Append("<Row").Append(Attr("de", Cells(de))).Append(Attr("en", Cells(en))).Append(" />"); return this; }
+
+        /// <summary>Starts a link list on the open page.</summary>
+        /// <param name="columns">Columns (1 to 6), 0 = default.</param>
+        public SyntrixWikiXml List(int columns = 0) { EndBlock(); _sb.Append("<List").Append(columns > 0 ? Attr("Columns", columns.ToString()) : "").Append('>'); _list = true; return this; }
+
+        /// <summary>Entry of the open list.</summary>
+        /// <param name="page">Page a click opens, null = none.</param>
+        /// <param name="de">German text.</param>
+        /// <param name="en">English text.</param>
+        /// <param name="extraDe">Second German text in quiet colour, null = none.</param>
+        /// <param name="extraEn">Second English text, null = none.</param>
+        /// <param name="icons">Icons (material names or definition ids such as "MyObjectBuilder_Ore/Iron", ';'), null = none.</param>
+        /// <param name="block">Block "Type/Subtype" whose icon is shown when icons is null.</param>
+        public SyntrixWikiXml Entry(string page, string de, string en, string extraDe = null, string extraEn = null, string icons = null, string block = null)
+        {
+            _sb.Append("<Entry").Append(Attr("Page", page)).Append(Attr("Block", block)).Append(Attr("Icons", icons))
+               .Append(Attr("de", de)).Append(Attr("en", en)).Append(Attr("ExtraDe", extraDe)).Append(Attr("ExtraEn", extraEn)).Append(" />");
+            return this;
+        }
+
+        /// <summary>Problem for the wiki error page.</summary>
+        public SyntrixWikiXml Error(string text) { EndPage(); _sb.Append("<Error>").Append(Escape(text)).Append("</Error>"); return this; }
+
+        /// <summary>The finished &lt;SyxWiki&gt; text.</summary>
+        public override string ToString()
+        {
+            EndPage();
+            return _sb.ToString() + "</SyxWiki>";
+        }
+
+        private SyntrixWikiXml Long(string element, string de, string en)
+        {
+            EndBlock();
+            _sb.Append('<').Append(element).Append('>');
+            if (!string.IsNullOrEmpty(de))
+                _sb.Append("<de>").Append(Escape(de)).Append("</de>");
+            if (!string.IsNullOrEmpty(en))
+                _sb.Append("<en>").Append(Escape(en)).Append("</en>");
+            _sb.Append("</").Append(element).Append('>');
+            return this;
+        }
+
+        private void EndBlock()
+        {
+            if (_table)
+                _sb.Append("</Table>");
+            if (_list)
+                _sb.Append("</List>");
+            _table = _list = false;
+        }
+
+        private void EndPage()
+        {
+            EndBlock();
+            if (_page)
+                _sb.Append("</Page>");
+            _page = false;
+        }
+
+        private static string Cells(string[] cells)
+        {
+            if (cells == null)
+                return null;
+            var parts = new string[cells.Length];
+            for (int i = 0; i < cells.Length; i++)
+                parts[i] = string.IsNullOrEmpty(cells[i]) ? " " : cells[i].Replace("\r", "").Replace("\n", " ");
+            return string.Join("|", parts);
+        }
+
+        private static string Attr(string name, string value)
+        {
+            return value == null ? "" : " " + name + "=\"" + Escape(value) + "\"";
+        }
+
+        /// <summary>Text for XML (&amp;, &lt;, &gt;, quotes).</summary>
+        public static string Escape(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return "";
+            return text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
+        }
     }
 
     /// <summary>Log lines with the mod name in front; optionally also into an own file in local storage.</summary>
