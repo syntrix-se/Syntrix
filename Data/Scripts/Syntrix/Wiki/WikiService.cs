@@ -13,7 +13,8 @@ namespace Syntrix.Wiki
 {
     /// <summary>
     /// In-game wiki (API 3): reads Data/Syntrix-Wiki.xml of every loaded mod, adds the pages of generating mods
-    /// (Wiki.AddSource) and fills automatic tables and lists (Wiki.AddTables). Opens with F11 or /syxwiki;
+    /// (Wiki.AddSource) and the pages from the game definitions (WikiAuto), and fills automatic tables and lists
+    /// (WikiAuto, WikiFood, then the mods through Wiki.AddTables). Opens with F11 or /syxwiki;
     /// players only, nothing runs on the dedicated server.
     /// </summary>
     public sealed class WikiService
@@ -30,6 +31,7 @@ namespace Syntrix.Wiki
             new Dictionary<string, Func<string, string, string, string, string, string>>();
         private readonly Dictionary<string, Action> _closed = new Dictionary<string, Action>();
         private WikiData _data;
+        private WikiData _light;
         private string _context;
         private bool _dirty = true;
         private bool _loading;
@@ -68,6 +70,9 @@ namespace Syntrix.Wiki
                 _window.CloseNow();
             _window = null;
             _data = null;
+            _light = null;
+            WikiAuto.Reset();
+            WikiTexts.Reset();
             _sources.Clear();
             _tables.Clear();
             _closed.Clear();
@@ -116,6 +121,69 @@ namespace Syntrix.Wiki
             return _context;
         }
 
+        /// <summary>
+        /// Planet for an exact or partial definition subtype: page id, name, image material ("" if none), image credit,
+        /// facts, short line with gravity, atmosphere and temperature; null if none matches.
+        /// </summary>
+        public string[] Planet(string definition, bool german)
+        {
+            if (!Usable || string.IsNullOrWhiteSpace(definition))
+                return null;
+            try
+            {
+                MyPlanetGeneratorDefinition generator;
+                var p = WikiAuto.PlanetForPart(Light(), definition.Trim(), out generator);
+                if (p == null)
+                    return null;
+                var image = p.Image != null && GuiDraw.Exists(p.Image) ? p.Image : "";
+                return new[] { p.Id, p.Name(german), image, p.ImageSource ?? "", WikiData.Pick(german, p.FactsDe, p.FactsEn), WikiAuto.PlanetSummary(generator, german) };
+            }
+            catch (Exception e)
+            {
+                Log.Error("wiki planet", e);
+                return null;
+            }
+        }
+
+        /// <summary>Title of a page in the language (pages of the files, systems and planets), null if unknown.</summary>
+        public string Title(string page, bool german)
+        {
+            if (!Usable || string.IsNullOrWhiteSpace(page))
+                return null;
+            try
+            {
+                var id = page.Trim();
+                var data = _data ?? Light();
+                WikiPage p;
+                if (data.Pages.TryGetValue(id, out p))
+                    return p.Title(german);
+                WikiPlanet planet;
+                if (data.Planets.TryGetValue(id, out planet))
+                    return planet.Name(german);
+                foreach (var s in data.Systems)
+                    if (string.Equals(s.Id, id, StringComparison.OrdinalIgnoreCase))
+                        return WikiData.Pick(german, s.De, s.En);
+                return null;
+            }
+            catch (Exception e)
+            {
+                Log.Error("wiki title", e);
+                return null;
+            }
+        }
+
+        /// <summary>The wiki files with systems and planets only (no generated pages), read once until Reload.</summary>
+        private WikiData Light()
+        {
+            if (_light == null)
+            {
+                var data = WikiLoader.Load();
+                WikiAuto.AddCollection(data);
+                _light = data;
+            }
+            return _light;
+        }
+
         /// <summary>The wiki window is open.</summary>
         public bool IsOpen => _window != null && _window.IsOpen;
 
@@ -158,6 +226,8 @@ namespace Syntrix.Wiki
         {
             _dirty = true;
             _context = null;
+            _light = null;
+            WikiTexts.Reset();
             if (_window != null && Usable)
             {
                 EnsureLoaded();
@@ -179,6 +249,15 @@ namespace Syntrix.Wiki
                 _context = BuildContext(data);
                 foreach (var kv in _sources.ToArray())
                     MergeSource(data, kv.Key, kv.Value);
+                try
+                {
+                    WikiAuto.Reset();
+                    WikiAuto.CreatePages(data);
+                }
+                catch (Exception e)
+                {
+                    data.Errors.Add("Generated pages not created: " + e.Message);
+                }
                 data.Finish(FillAuto);
                 _data = data;
                 _dirty = false;
@@ -248,6 +327,11 @@ namespace Syntrix.Wiki
 
         private void FillBlock(WikiData data, WikiPage page, WikiBlock block)
         {
+            if (WikiAuto.FillOne(data, page, block))
+            {
+                Empty(block);
+                return;
+            }
             bool table = block.Kind == WikiBlockKind.Table;
             string xml = null, mod = null;
             foreach (var kv in _tables)
@@ -330,7 +414,7 @@ namespace Syntrix.Wiki
                 block.Entries.Add(new WikiEntry { De = "Keine Einträge.", En = "No entries." });
         }
 
-        /// <summary>Block="Type/Subtype" on pages and list entries: the definition icon (or a SyxWikiIcon_ material).</summary>
+        /// <summary>Block="Type/Subtype" on pages and list entries: the definition id, drawn as its icon.</summary>
         private static void ResolveBlockIcons(WikiData data)
         {
             foreach (var page in data.Pages.Values)

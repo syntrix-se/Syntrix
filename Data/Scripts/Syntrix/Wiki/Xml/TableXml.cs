@@ -12,7 +12,7 @@ namespace Syntrix.Wiki
         [XmlAttribute("Widths")]
         public string Widths;
 
-        /// <summary>Automatic table: Ores, Components, Planets, OresPerPlanet, PlanetData (and those of WikiForeign).</summary>
+        /// <summary>Automatic table: Ores, Components, Planets, OresPerPlanet, PlanetData, Recipes (and those of the mods).</summary>
         [XmlAttribute("Auto")]
         public string Auto;
 

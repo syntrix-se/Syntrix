@@ -8,7 +8,7 @@ namespace Syntrix.Wiki
     /// <summary>Element &lt;List&gt; of a page, by hand or automatic.</summary>
     public class ListXml : LangTextXml
     {
-        /// <summary>Automatic list: Ores, Components, OresPerPlanet (and those of WikiForeign).</summary>
+        /// <summary>Automatic list: Ores, Components, OresPerPlanet, Ingredients, Meals, Spoiled, Seeds (and those of the mods).</summary>
         [XmlAttribute("Auto")]
         public string Auto;
 

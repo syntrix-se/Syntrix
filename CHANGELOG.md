@@ -45,9 +45,17 @@ API 2 stay registered and report "not available".
   switch, "new" and "important" marks, error page for authors.
 - Every loaded mod adds pages with `Data/Syntrix-Wiki.xml`; new attributes for generating mods
   (`Icons`, `Source`, `ExtraDe`, `ExtraEn`, `<Profile>`, `<Error>`).
+- Pages and tables from the game definitions, for Vanilla and every mod: ore, component, system and
+  planet pages; tables `Ores`, `Components`, `Planets`, `OresPerPlanet`, `PlanetData`, `Recipes`;
+  lists `Ores`, `Components`, `OresPerPlanet`, `Ingredients`, `Meals`, `Spoiled`, `Seeds`. Public
+  planets that no `<System>` names go to the page "planets". Icons come from the definition ids.
+- Generated lists show public definitions only; `<Hide Id="Type/Subtype" />` and
+  `<Show Id="Type/Subtype" />` in a wiki file change that. A hand-written page with the id of a
+  generated one stays and gets the generated blocks appended.
 - Endpoints `Wiki.Open`, `Wiki.Close`, `Wiki.IsOpen`, `Wiki.OnClosed`, `Wiki.AddSource`,
-  `Wiki.AddTables`, `Wiki.Context`, `Wiki.Reload`; in the dock file `WikiOpen`, `WikiClose`,
-  `WikiIsOpen`, `WikiOnClosed`, `WikiAddSource`, `WikiAddTables`, `WikiContext`, `WikiReload`.
+  `Wiki.AddTables`, `Wiki.Context`, `Wiki.Reload`, `Wiki.Planet`, `Wiki.Title`, `Wiki.Text`; in the
+  dock file `WikiOpen`, `WikiClose`, `WikiIsOpen`, `WikiOnClosed`, `WikiAddSource`, `WikiAddTables`,
+  `WikiContext`, `WikiReload`, `WikiPlanet`, `WikiTitle`, `WikiText`.
 
 ## 1.1.0 (API version 2)
 

@@ -46,6 +46,12 @@ namespace Syntrix.Wiki
         /// <summary>System lists as read, with their mod in Source (context for generating mods).</summary>
         public readonly List<SystemXml> SystemSources = new List<SystemXml>();
 
+        /// <summary>Definitions ("Type/Subtype") the generated lists leave out (&lt;Hide&gt;).</summary>
+        public readonly HashSet<string> Hidden = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Hidden definitions ("Type/Subtype") the generated lists take in (&lt;Show&gt;).</summary>
+        public readonly HashSet<string> Shown = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         private readonly List<KeyValuePair<WikiPageXml, string>> _additions = new List<KeyValuePair<WikiPageXml, string>>();
 
         /// <summary>A link [[target]] or [[target|text]] inside a text.</summary>
@@ -110,6 +116,8 @@ namespace Syntrix.Wiki
                     if (!string.IsNullOrWhiteSpace(error))
                         Errors.Add(source + ": " + error.Trim());
             MergeSystems(file, origin, source);
+            MergeIds(file.Hide, Hidden, origin, "Hide");
+            MergeIds(file.Show, Shown, origin, "Show");
             if (file.Pages == null)
                 return;
             foreach (var x in file.Pages)
@@ -142,6 +150,24 @@ namespace Syntrix.Wiki
                 ApplyLevelAndSymbol(page, x, origin);
                 MergeBlocks(page, x, origin);
                 Pages[id] = page;
+            }
+        }
+
+        private void MergeIds(List<DefinitionRefXml> list, HashSet<string> target, string origin, string element)
+        {
+            if (list == null)
+                return;
+            foreach (var x in list)
+            {
+                var id = x?.Id?.Trim();
+                if (string.IsNullOrEmpty(id) || id.IndexOf('/') <= 0)
+                {
+                    Errors.Add($"{origin}: <{element}> needs Id=\"Type/Subtype\"");
+                    continue;
+                }
+                if (id.StartsWith("MyObjectBuilder_", StringComparison.Ordinal))
+                    id = id.Substring("MyObjectBuilder_".Length);
+                target.Add(id);
             }
         }
 
