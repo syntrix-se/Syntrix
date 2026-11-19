@@ -11,5 +11,18 @@
         <guid>583FC123-E62D-4269-A84C-14B32976D720</guid>
       </RegisteredStorageGuids>
     </EntityComponent>
+
+    <!-- API 4: the shared use object (F key). Put it into the entity container of a block:
+         <Component BuilderType="MyObjectBuilder_UseObjectsComponent" SubtypeId="SyntrixUse" ForceCreate="true" />
+         F then runs the action a mod registered with UseRegister for the block type; without one F opens the
+         terminal of the block. Never rename this subtype. -->
+    <EntityComponent xsi:type="MyObjectBuilder_UseObjectsComponentDefinition">
+      <Id>
+        <TypeId>UseObjectsComponent</TypeId>
+        <SubtypeId>SyntrixUse</SubtypeId>
+      </Id>
+      <LoadFromModel>true</LoadFromModel>
+      <UseObjectTypeOverride>syntrix</UseObjectTypeOverride>
+    </EntityComponent>
   </EntityComponents>
 </Definitions>
