@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.2 (API version 3)
+
+- Tabs (`GuiTabs`) use the Vanilla button textures like the tabs of the terminal: normal, hovered and
+  pressed for the selected tab. Before, they used the striped toolbar tabs of the G menu, which glowed
+  light blue and looked the same for the selected and the hovered tab.
+
 ## 1.2.1 (API version 3)
 
 - Materials `SyxGui_GridLarge` and `SyxGui_GridSmall`: the grid size symbols of the G menu, for icons

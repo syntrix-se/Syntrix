@@ -50,7 +50,7 @@ namespace Syntrix.Gui
                 var r = new RectangleF(x, Rect.Y, w, Rect.Height);
                 bool hover = i == HoverIndex && Hovered && item.Enabled;
                 bool sel = i == Selected;
-                GuiDraw.Texture(sel || hover ? GuiStyle.TabHover : GuiStyle.Tab, r, item.Enabled ? Color.White : new Color(160, 160, 160, 200));
+                GuiDraw.Texture(sel ? GuiStyle.TabSelected : hover ? GuiStyle.TabHover : GuiStyle.Tab, r,item.Enabled ? Color.White : new Color(160, 160, 160, 200));
                 GuiDraw.TextIn(sel || hover ? GuiStyle.FontBright : EffectiveFont, GuiRichText.Plain(item.Text), r, TextScale,
                     item.Enabled ? (sel ? Color.White : TextColor) : GuiStyle.TextDisabled, 1);
                 x += w + 4f * K;
