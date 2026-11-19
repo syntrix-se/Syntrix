@@ -202,6 +202,7 @@ namespace Syntrix.Wiki
                     _window.SetSeen(ReadLines(SeenFile));
                     _window.SetData(_data);
                 }
+                _window.SetLanguage(German);
                 if (!string.IsNullOrWhiteSpace(page))
                     _window.ShowId(page.Trim());
                 _lastToggle = DateTime.UtcNow;

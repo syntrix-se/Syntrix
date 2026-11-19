@@ -22,7 +22,7 @@ namespace Syntrix.Wiki
         private readonly GuiWindow _window;
         private readonly GuiTextField _search;
         private readonly GuiTree _tree;
-        private readonly GuiButton _back, _forward, _language;
+        private readonly GuiButton _back, _forward;
         private readonly GuiLabel _path;
         private readonly GuiScroll _page;
 
@@ -72,9 +72,6 @@ namespace Syntrix.Wiki
             bar.Add(_forward);
             _path = new GuiLabel { FillWidth = true, Wrap = false, TextColor = GuiStyle.TextQuiet, Anchor = 3 };
             bar.Add(_path);
-            _language = new GuiButton { Size = new Vector2(130f, 0f) };
-            _language.Handler = (e, ev, i, t) => { if (ev == GuiEvent.Click && i == 0) SwitchLanguage(); };
-            bar.Add(_language);
 
             _page = new GuiScroll { FillWidth = true, FillHeight = true, Spacing = 10f, Padding = new Vector2(28f, 20f) };
             right.Add(_page);
@@ -242,10 +239,15 @@ namespace Syntrix.Wiki
                 Show(page, false);
         }
 
-        private void SwitchLanguage()
+        /// <summary>Follows the game language (German or English); rebuilds only if it changed.</summary>
+        public void SetLanguage(bool german)
         {
-            _german = !_german;
+            if (german == _german)
+                return;
+            _german = german;
             LanguageTexts();
+            if (_data == null)
+                return;
             BuildTree();
             BuildPage();
             UpdateBar();
@@ -253,7 +255,6 @@ namespace Syntrix.Wiki
 
         private void LanguageTexts()
         {
-            _language.SetText(GuiProp.Text, _german ? "English" : "Deutsch");
             _search.Placeholder = _german ? "Suchen …" : "Search …";
             _back.Tooltip = _german ? "Zurück" : "Back";
             _forward.Tooltip = _german ? "Vor" : "Forward";
