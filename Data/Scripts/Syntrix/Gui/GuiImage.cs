@@ -32,7 +32,7 @@ namespace Syntrix.Gui
         {
             if (_layers == null)
                 return;
-            var tint = Color.A > 0 && Style == GuiStyleId.Default ? Color.White : Color.White;
+            var tint = Color.White;
             foreach (var m in _layers)
             {
                 if (Style == 1)

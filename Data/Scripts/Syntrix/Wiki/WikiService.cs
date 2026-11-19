@@ -318,7 +318,7 @@ namespace Syntrix.Wiki
             Empty(block);
         }
 
-        /// <summary>Empty automatic table: one quiet row instead of nothing.</summary>
+        /// <summary>Empty automatic table or list: one quiet row instead of nothing.</summary>
         private static void Empty(WikiBlock block)
         {
             if (block.Kind == WikiBlockKind.Table && block.RowsDe.Count == 0)
@@ -326,6 +326,8 @@ namespace Syntrix.Wiki
                 block.RowsDe.Add(new[] { "Keine Einträge." });
                 block.RowsEn.Add(new[] { "No entries." });
             }
+            else if (block.Kind == WikiBlockKind.List && block.Entries != null && block.Entries.Count == 0)
+                block.Entries.Add(new WikiEntry { De = "Keine Einträge.", En = "No entries." });
         }
 
         /// <summary>Block="Type/Subtype" on pages and list entries: the definition icon (or a SyxWikiIcon_ material).</summary>

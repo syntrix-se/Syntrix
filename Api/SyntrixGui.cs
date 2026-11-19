@@ -61,14 +61,23 @@ namespace Syntrix.Api
     /// <summary>Properties (API 3). Values are fixed. Sizes and offsets are reference pixels (screen 1080 high).</summary>
     public static class GuiProp
     {
+        /// <summary>Property ids for SetBool/SetInt/... (fixed values).</summary>
         public const int Visible = 1, Enabled = 2, Offset = 3, Size = 4, Anchor = 5, FillWidth = 6, FillHeight = 7, Padding = 8;
+        /// <summary>Property ids (fixed values).</summary>
         public const int Color = 9, BorderColor = 10, BorderWidth = 11, Tooltip = 12, Text = 13, TextColor = 14, TextScale = 15;
+        /// <summary>Property ids (fixed values).</summary>
         public const int Font = 16, Align = 17, Wrap = 18, Markup = 19, Value = 20, Min = 21, Max = 22, Step = 23, Checked = 24;
+        /// <summary>Property ids (fixed values).</summary>
         public const int Selected = 25, Material = 26, Spacing = 27, Horizontal = 28, ScrollPosition = 29, Columns = 30;
+        /// <summary>Property ids (fixed values).</summary>
         public const int RowHeight = 31, Title = 32, Pause = 33, EscapeCloses = 34, CloseButton = 35, BackgroundFade = 36;
+        /// <summary>Property ids (fixed values).</summary>
         public const int MaxLength = 37, Placeholder = 38, Focused = 39, Style = 40, IconSize = 41, Widths = 42, Header = 43;
+        /// <summary>Property ids (fixed values).</summary>
         public const int ScrollMax = 44, ContentSize = 45, ScreenPosition = 46, ScreenSize = 47, IsOpen = 48, Position = 49;
+        /// <summary>Property ids (fixed values).</summary>
         public const int Clip = 50, Hover = 51, Format = 52, MouseMove = 53, SelectedKey = 54, Layer = 55, WindowSize = 56;
+        /// <summary>Property ids (fixed values).</summary>
         public const int Multiline = 57, ShowInMenus = 58, TextHeight = 59, ScrollToEnd = 60;
     }
 
@@ -87,6 +96,7 @@ namespace Syntrix.Api
         public const int Expand = 5;
         /// <summary>Link clicked; text = target.</summary>
         public const int Link = 6;
+        /// <summary>Window was opened.</summary>
         public const int Opened = 7;
         /// <summary>Window closed; index 1 = session unloading.</summary>
         public const int Closed = 8;
@@ -105,6 +115,7 @@ namespace Syntrix.Api
     /// <summary>Values of <see cref="GuiProp.Style"/>.</summary>
     public static class GuiStyleId
     {
+        /// <summary>Normal look of the element kind.</summary>
         public const int Default = 0;
         /// <summary>Panel: Vanilla dark area; button: red (danger).</summary>
         public const int Dark = 1;
@@ -121,12 +132,14 @@ namespace Syntrix.Api
     /// <summary>Item properties for <see cref="GuiNode.ItemSet"/>.</summary>
     public static class GuiItemProp
     {
+        /// <summary>Item property ids for ItemSet (fixed values).</summary>
         public const int Text = 1, Icons = 2, Enabled = 3, Expanded = 4, Extra = 5, Color = 6, Tooltip = 7, Badge = 8;
     }
 
     /// <summary>Anchor values (position inside the parent).</summary>
     public static class GuiAnchor
     {
+        /// <summary>Anchor positions inside the parent (fixed values).</summary>
         public const int TopLeft = 0, Top = 1, TopRight = 2, Left = 3, Centre = 4, Right = 5, BottomLeft = 6, Bottom = 7, BottomRight = 8;
     }
 
@@ -177,6 +190,7 @@ namespace Syntrix.Api
         /// <summary>Runs when the service became available or went away (Syntrix loaded or unloaded).</summary>
         public event Action AvailabilityChanged;
 
+        /// <summary>Docks the window service to Syntrix through the given API object (players only).</summary>
         public SyntrixGui(SyntrixApi api)
         {
             _api = api;
@@ -338,6 +352,7 @@ namespace Syntrix.Api
         /// <summary>The element exists in Syntrix.</summary>
         public bool IsValid { get { return Handle > 0 && Gui != null; } }
 
+        /// <summary>Parent element, null for windows and overlays.</summary>
         public GuiNode Parent { get { return ParentNode; } }
 
         internal virtual void Raise(int ev, int index, string text)
@@ -370,10 +385,15 @@ namespace Syntrix.Api
             return node;
         }
 
+        /// <summary>Adds a panel (free placement of its children by anchor).</summary>
         public GuiPanel AddPanel(int style = GuiStyleId.Default) { var n = Child(new GuiPanel(), GuiKind.Panel); if (style != 0) n.Style = style; return n; }
+        /// <summary>Adds a stack that lines up its children (vertical or horizontal).</summary>
         public GuiStack AddStack(bool horizontal = false, float spacing = 6f) { var n = Child(new GuiStack(), GuiKind.Stack); if (horizontal) n.Horizontal = true; if (spacing != 6f) n.Spacing = spacing; return n; }
+        /// <summary>Adds a vertical stack with a scroll bar.</summary>
         public GuiScroll AddScroll() { return Child(new GuiScroll(), GuiKind.Scroll); }
+        /// <summary>Adds a text (markup, wraps at its width).</summary>
         public GuiLabel AddLabel(string text = null) { var n = Child(new GuiLabel(), GuiKind.Label); if (text != null) n.Text = text; return n; }
+        /// <summary>Adds a button; onClick runs on a click.</summary>
         public GuiButton AddButton(string text = null, Action onClick = null)
         {
             var n = Child(new GuiButton(), GuiKind.Button);
@@ -381,15 +401,25 @@ namespace Syntrix.Api
             if (onClick != null) n.Click += b => { if (b == 0) onClick(); };
             return n;
         }
+        /// <summary>Adds an image (material name or definition id).</summary>
         public GuiImage AddImage(string material = null) { var n = Child(new GuiImage(), GuiKind.Image); if (material != null) n.Material = material; return n; }
+        /// <summary>Adds a text field.</summary>
         public GuiTextField AddTextField(string text = null) { var n = Child(new GuiTextField(), GuiKind.TextField); if (text != null) n.Text = text; return n; }
+        /// <summary>Adds a list with selection.</summary>
         public GuiList AddList() { return Child(new GuiList(), GuiKind.List); }
+        /// <summary>Adds a tree with branches that open and close.</summary>
         public GuiTree AddTree() { return Child(new GuiTree(), GuiKind.Tree); }
+        /// <summary>Adds a table with header and rows.</summary>
         public GuiTable AddTable() { return Child(new GuiTable(), GuiKind.Table); }
+        /// <summary>Adds a check box with text.</summary>
         public GuiCheckBox AddCheckBox(string text = null) { var n = Child(new GuiCheckBox(), GuiKind.CheckBox); if (text != null) n.Text = text; return n; }
+        /// <summary>Adds a slider from min to max.</summary>
         public GuiSlider AddSlider(float min = 0f, float max = 1f, float value = 0f) { var n = Child(new GuiSlider(), GuiKind.Slider); n.Min = min; n.Max = max; n.Value = value; return n; }
+        /// <summary>Adds a progress bar (Value 0..1).</summary>
         public GuiProgressBar AddProgressBar() { return Child(new GuiProgressBar(), GuiKind.ProgressBar); }
+        /// <summary>Adds a row of tabs.</summary>
         public GuiTabs AddTabs() { return Child(new GuiTabs(), GuiKind.Tabs); }
+        /// <summary>Adds a drop-down list.</summary>
         public GuiDropdown AddDropdown() { return Child(new GuiDropdown(), GuiKind.Dropdown); }
         /// <summary>Drawing area for special cases: draw(rect in screen pixels x, y, w, h; alpha) with MyScreenSpaceSprite.DrawPixels and MyScreenSpaceText.</summary>
         public GuiCanvas AddCanvas(Action<Vector4, float> draw = null) { var n = Child(new GuiCanvas(), GuiKind.Canvas); if (draw != null) n.SetDraw(draw); return n; }
@@ -432,22 +462,36 @@ namespace Syntrix.Api
 
         // ---------- raw properties ----------
 
+        /// <summary>Sets a property (GuiProp) as bool.</summary>
         public void SetBool(int prop, bool v) { if (IsValid && Gui.SetBool_ != null) Gui.SetBool_(Handle, prop, v); }
+        /// <summary>Sets a property (GuiProp) as int.</summary>
         public void SetInt(int prop, int v) { if (IsValid && Gui.SetInt_ != null) Gui.SetInt_(Handle, prop, v); }
+        /// <summary>Sets a property (GuiProp) as float.</summary>
         public void SetFloat(int prop, float v) { if (IsValid && Gui.SetFloat_ != null) Gui.SetFloat_(Handle, prop, v); }
+        /// <summary>Sets a property (GuiProp) as vector.</summary>
         public void SetVector(int prop, Vector2 v) { if (IsValid && Gui.SetVector_ != null) Gui.SetVector_(Handle, prop, v); }
+        /// <summary>Sets a property (GuiProp) as colour.</summary>
         public void SetColor(int prop, Color v) { if (IsValid && Gui.SetColor_ != null) Gui.SetColor_(Handle, prop, v); }
+        /// <summary>Sets a property (GuiProp) as text.</summary>
         public void SetText(int prop, string v) { if (IsValid && Gui.SetText_ != null) Gui.SetText_(Handle, prop, v); }
+        /// <summary>Reads a property (GuiProp) as bool.</summary>
         public bool GetBool(int prop) { return IsValid && Gui.GetBool_ != null && Gui.GetBool_(Handle, prop); }
+        /// <summary>Reads a property (GuiProp) as int.</summary>
         public int GetInt(int prop) { return IsValid && Gui.GetInt_ != null ? Gui.GetInt_(Handle, prop) : 0; }
+        /// <summary>Reads a property (GuiProp) as float.</summary>
         public float GetFloat(int prop) { return IsValid && Gui.GetFloat_ != null ? Gui.GetFloat_(Handle, prop) : 0f; }
+        /// <summary>Reads a property (GuiProp) as vector.</summary>
         public Vector2 GetVector(int prop) { return IsValid && Gui.GetVector_ != null ? Gui.GetVector_(Handle, prop) : Vector2.Zero; }
+        /// <summary>Reads a property (GuiProp) as colour.</summary>
         public Color GetColor(int prop) { return IsValid && Gui.GetColor_ != null ? Gui.GetColor_(Handle, prop) : Color.Transparent; }
+        /// <summary>Reads a property (GuiProp) as text.</summary>
         public string GetText(int prop) { return IsValid && Gui.GetText_ != null ? Gui.GetText_(Handle, prop) : null; }
 
         // ---------- common properties ----------
 
+        /// <summary>Drawn and laid out (hidden elements take no space).</summary>
         public bool Visible { get { return GetBool(GuiProp.Visible); } set { SetBool(GuiProp.Visible, value); } }
+        /// <summary>Reacts to the mouse; disabled elements are drawn quiet.</summary>
         public bool Enabled { get { return GetBool(GuiProp.Enabled); } set { SetBool(GuiProp.Enabled, value); } }
         /// <summary>Offset from the anchored position, reference pixels.</summary>
         public Vector2 Offset { get { return GetVector(GuiProp.Offset); } set { SetVector(GuiProp.Offset, value); } }
@@ -455,17 +499,23 @@ namespace Syntrix.Api
         public Vector2 Size { get { return GetVector(GuiProp.Size); } set { SetVector(GuiProp.Size, value); } }
         /// <summary>Position inside the parent, see <see cref="GuiAnchor"/>.</summary>
         public int Anchor { get { return GetInt(GuiProp.Anchor); } set { SetInt(GuiProp.Anchor, value); } }
+        /// <summary>Takes the remaining width of the parent.</summary>
         public bool FillWidth { get { return GetBool(GuiProp.FillWidth); } set { SetBool(GuiProp.FillWidth, value); } }
+        /// <summary>Takes the remaining height of the parent.</summary>
         public bool FillHeight { get { return GetBool(GuiProp.FillHeight); } set { SetBool(GuiProp.FillHeight, value); } }
+        /// <summary>Inner distance to the children in reference pixels (x left/right, y top/bottom).</summary>
         public Vector2 Padding { get { return GetVector(GuiProp.Padding); } set { SetVector(GuiProp.Padding, value); } }
         /// <summary>Background colour (panels) or tint.</summary>
         public Color Color { get { return GetColor(GuiProp.Color); } set { SetColor(GuiProp.Color, value); } }
+        /// <summary>Colour of the border, transparent = none.</summary>
         public Color BorderColor { get { return GetColor(GuiProp.BorderColor); } set { SetColor(GuiProp.BorderColor, value); } }
+        /// <summary>Width of the border in reference pixels.</summary>
         public float BorderWidth { get { return GetFloat(GuiProp.BorderWidth); } set { SetFloat(GuiProp.BorderWidth, value); } }
         /// <summary>Tooltip with markup, null = none.</summary>
         public string Tooltip { get { return GetText(GuiProp.Tooltip); } set { SetText(GuiProp.Tooltip, value); } }
         /// <summary>Font name, inherited by the children; null = Vanilla.</summary>
         public string Font { get { return GetText(GuiProp.Font); } set { SetText(GuiProp.Font, value); } }
+        /// <summary>Colour of the text (images: tint).</summary>
         public Color TextColor { get { return GetColor(GuiProp.TextColor); } set { SetColor(GuiProp.TextColor, value); } }
         /// <summary>Text size, 0.8 = Vanilla.</summary>
         public float TextScale { get { return GetFloat(GuiProp.TextScale); } set { SetFloat(GuiProp.TextScale, value); } }
@@ -473,6 +523,7 @@ namespace Syntrix.Api
         public int Align { get { return GetInt(GuiProp.Align); } set { SetInt(GuiProp.Align, value); } }
         /// <summary>See <see cref="GuiStyleId"/>.</summary>
         public int Style { get { return GetInt(GuiProp.Style); } set { SetInt(GuiProp.Style, value); } }
+        /// <summary>Cuts off children outside of the element.</summary>
         public bool Clip { get { return GetBool(GuiProp.Clip); } set { SetBool(GuiProp.Clip, value); } }
         /// <summary>Mouse is over the element.</summary>
         public bool Hover { get { return GetBool(GuiProp.Hover); } }
@@ -493,15 +544,20 @@ namespace Syntrix.Api
         }
         /// <summary>Changes an item property (<see cref="GuiItemProp"/>).</summary>
         public void ItemSet(int index, int prop, string value) { if (IsValid && Gui.ItemSet_ != null) Gui.ItemSet_(Handle, index, prop, value); }
+        /// <summary>Removes the item at the index.</summary>
         public void ItemRemove(int index) { if (IsValid && Gui.ItemRemove_ != null) Gui.ItemRemove_(Handle, index); }
+        /// <summary>Removes all items.</summary>
         public void ItemClear() { if (IsValid && Gui.ItemClear_ != null) Gui.ItemClear_(Handle); }
+        /// <summary>Number of items.</summary>
         public int ItemCount { get { return IsValid && Gui.ItemCount_ != null ? Gui.ItemCount_(Handle) : 0; } }
+        /// <summary>Index of the item with this key, -1 if missing.</summary>
         public int ItemFind(string key) { return IsValid && Gui.ItemFind_ != null ? Gui.ItemFind_(Handle, key) : -1; }
     }
 
     /// <summary>Elements with a text.</summary>
     public class GuiTextNode : GuiNode
     {
+        /// <summary>Text (markup unless Markup is off).</summary>
         public string Text { get { return GetText(GuiProp.Text); } set { SetText(GuiProp.Text, value); } }
     }
 
@@ -521,21 +577,26 @@ namespace Syntrix.Api
 
         /// <summary>Selected item, -1 = none (setting it raises no event).</summary>
         public int Selection { get { return GetInt(GuiProp.Selected); } set { SetInt(GuiProp.Selected, value); } }
+        /// <summary>Key of the selected item, null = none.</summary>
         public string SelectedKey { get { return GetText(GuiProp.SelectedKey); } set { SetText(GuiProp.SelectedKey, value); } }
         /// <summary>Row height in reference pixels, 0 = automatic.</summary>
         public float RowHeight { get { return GetFloat(GuiProp.RowHeight); } set { SetFloat(GuiProp.RowHeight, value); } }
+        /// <summary>Size of the icons in reference pixels.</summary>
         public Vector2 IconSize { get { return GetVector(GuiProp.IconSize); } set { SetVector(GuiProp.IconSize, value); } }
+        /// <summary>Scroll position in reference pixels from the top.</summary>
         public float ScrollPosition { get { return GetFloat(GuiProp.ScrollPosition); } set { SetFloat(GuiProp.ScrollPosition, value); } }
     }
 
     /// <summary>Window. Size and Position are normalized GUI coordinates (Vanilla terminal 1.0157 x 0.9172).</summary>
     public sealed class GuiWindow : GuiNode
     {
+        /// <summary>Runs when the window opens.</summary>
         public event Action Opened;
         /// <summary>Closed; true while the session unloads.</summary>
         public event Action<bool> Closed;
         /// <summary>Esc while <see cref="EscapeCloses"/> is off.</summary>
         public event Action Cancelled;
+        /// <summary>Runs when the window size changes.</summary>
         public event Action Resized;
 
         internal override void RaiseTyped(int ev, int index, string text)
@@ -546,11 +607,15 @@ namespace Syntrix.Api
             else if (ev == GuiEvent.Resized && Resized != null) Resized();
         }
 
+        /// <summary>Title in the header.</summary>
         public string Title { get { return GetText(GuiProp.Title); } set { SetText(GuiProp.Title, value); } }
         /// <summary>Pauses the game in single player while open (set before Open).</summary>
         public bool Pause { get { return GetBool(GuiProp.Pause); } set { SetBool(GuiProp.Pause, value); } }
+        /// <summary>Esc closes the window (default on).</summary>
         public bool EscapeCloses { get { return GetBool(GuiProp.EscapeCloses); } set { SetBool(GuiProp.EscapeCloses, value); } }
+        /// <summary>Close button in the header (default on).</summary>
         public bool CloseButton { get { return GetBool(GuiProp.CloseButton); } set { SetBool(GuiProp.CloseButton, value); } }
+        /// <summary>Darkens the game behind the window.</summary>
         public bool BackgroundFade { get { return GetBool(GuiProp.BackgroundFade); } set { SetBool(GuiProp.BackgroundFade, value); } }
         /// <summary>Normalized size; Vector2.Zero = Vanilla terminal size.</summary>
         public Vector2 WindowSize { get { return GetVector(GuiProp.WindowSize); } set { SetVector(GuiProp.WindowSize, value); } }
@@ -558,18 +623,21 @@ namespace Syntrix.Api
         public Vector2 Position { get { return GetVector(GuiProp.Position); } set { SetVector(GuiProp.Position, value); } }
         /// <summary>Content area below the title, reference pixels.</summary>
         public Vector2 ContentSize { get { return GetVector(GuiProp.ContentSize); } }
+        /// <summary>True while the window is open.</summary>
         public bool IsOpen { get { return GetBool(GuiProp.IsOpen); } }
         /// <summary>The window has the input focus.</summary>
         public bool HasFocus { get { return GetBool(GuiProp.Focused); } }
 
         /// <summary>Opens the window; false if the game refused (four mod windows open, no session).</summary>
         public bool Open() { return IsValid && Gui.Open_ != null && Gui.Open_(Handle); }
+        /// <summary>Closes the window.</summary>
         public void Close() { if (IsValid && Gui.Close_ != null) Gui.Close_(Handle); }
     }
 
     /// <summary>Layer on the whole screen without mouse. Hidden with the HUD and in menus unless ShowInMenus.</summary>
     public sealed class GuiOverlay : GuiNode
     {
+        /// <summary>Also shown while a menu or window shows the mouse cursor.</summary>
         public bool ShowInMenus { get { return GetBool(GuiProp.ShowInMenus); } set { SetBool(GuiProp.ShowInMenus, value); } }
         /// <summary>0 below the HUD, 1 above the HUD, 2 above everything.</summary>
         public int Layer { get { return GetInt(GuiProp.Layer); } set { SetInt(GuiProp.Layer, value); } }
@@ -581,6 +649,7 @@ namespace Syntrix.Api
     /// <summary>Children one below the other (or side by side).</summary>
     public class GuiStack : GuiNode
     {
+        /// <summary>Lines up the children from left to right instead of top to bottom.</summary>
         public bool Horizontal { get { return GetBool(GuiProp.Horizontal); } set { SetBool(GuiProp.Horizontal, value); } }
         /// <summary>Space between children, reference pixels.</summary>
         public float Spacing { get { return GetFloat(GuiProp.Spacing); } set { SetFloat(GuiProp.Spacing, value); } }
@@ -589,7 +658,9 @@ namespace Syntrix.Api
     /// <summary>Scroll area: children one below the other, Vanilla scroll bar.</summary>
     public sealed class GuiScroll : GuiStack
     {
+        /// <summary>Scroll position in reference pixels from the top.</summary>
         public float ScrollPosition { get { return GetFloat(GuiProp.ScrollPosition); } set { SetFloat(GuiProp.ScrollPosition, value); } }
+        /// <summary>Largest scroll position (0 = everything fits).</summary>
         public float ScrollMax { get { return GetFloat(GuiProp.ScrollMax); } }
         /// <summary>Stays at the end when the content grows (logs, chat).</summary>
         public bool ScrollToEnd { set { SetBool(GuiProp.ScrollToEnd, value); } }
@@ -600,8 +671,11 @@ namespace Syntrix.Api
     /// <summary>Text with wrapping and markup; links raise <see cref="GuiNode.Link"/>.</summary>
     public sealed class GuiLabel : GuiTextNode
     {
+        /// <summary>Wraps the text at the width (default on).</summary>
         public bool Wrap { get { return GetBool(GuiProp.Wrap); } set { SetBool(GuiProp.Wrap, value); } }
+        /// <summary>Reads markup ([b], [color=], [link=] ...; default on).</summary>
         public bool Markup { get { return GetBool(GuiProp.Markup); } set { SetBool(GuiProp.Markup, value); } }
+        /// <summary>Height of the laid out text in reference pixels.</summary>
         public float TextHeight { get { return GetFloat(GuiProp.TextHeight); } }
     }
 
@@ -610,20 +684,28 @@ namespace Syntrix.Api
     {
         /// <summary>Icon material shown left of the text (or alone).</summary>
         public string Material { get { return GetText(GuiProp.Material); } set { SetText(GuiProp.Material, value); } }
+        /// <summary>Size of the icons in reference pixels.</summary>
         public Vector2 IconSize { get { return GetVector(GuiProp.IconSize); } set { SetVector(GuiProp.IconSize, value); } }
+        /// <summary>Pressed state (toggle buttons, check boxes).</summary>
         public bool Checked { get { return GetBool(GuiProp.Checked); } set { SetBool(GuiProp.Checked, value); } }
     }
 
-    /// <summary>Image: material name, texture path (.dds) or definition id ("MyObjectBuilder_Ore/Iron"); several separated by ';' are layered.</summary>
+    /// <summary>
+    /// Image: TransparentMaterial name or definition id ("MyObjectBuilder_Ore/Iron"); several separated by ';' are
+    /// layered. Keeps the aspect ratio, Style = 1 stretches it into the size; TextColor tints it (white = as drawn).
+    /// </summary>
     public sealed class GuiImage : GuiNode
     {
+        /// <summary>Material name or definition id.</summary>
         public string Material { get { return GetText(GuiProp.Material); } set { SetText(GuiProp.Material, value); } }
     }
 
     /// <summary>Text field; Changed on every key, Submit on Enter.</summary>
     public sealed class GuiTextField : GuiTextNode
     {
+        /// <summary>Runs on Enter with the text.</summary>
         public event Action<string> Submitted;
+        /// <summary>Runs when the field loses the focus, with the text.</summary>
         public event Action<string> FocusLost;
 
         internal override void RaiseTyped(int ev, int index, string text)
@@ -632,15 +714,20 @@ namespace Syntrix.Api
             else if (ev == GuiEvent.FocusLost && FocusLost != null) FocusLost(text);
         }
 
+        /// <summary>Quiet text while the field is empty.</summary>
         public string Placeholder { get { return GetText(GuiProp.Placeholder); } set { SetText(GuiProp.Placeholder, value); } }
+        /// <summary>Largest number of characters (default 256).</summary>
         public int MaxLength { get { return GetInt(GuiProp.MaxLength); } set { SetInt(GuiProp.MaxLength, value); } }
+        /// <summary>Several lines: Enter submits, Shift+Enter breaks the line.</summary>
         public bool Multiline { get { return GetBool(GuiProp.Multiline); } set { SetBool(GuiProp.Multiline, value); } }
+        /// <summary>Has the keyboard focus.</summary>
         public bool Focused { get { return GetBool(GuiProp.Focused); } set { SetBool(GuiProp.Focused, value); } }
     }
 
     /// <summary>List with icons, second text (Extra), badge and selection; Columns &gt; 1 gives tiles.</summary>
     public sealed class GuiList : GuiItemsNode
     {
+        /// <summary>Number of columns of the list.</summary>
         public int Columns { get { return GetInt(GuiProp.Columns); } set { SetInt(GuiProp.Columns, value); } }
     }
 
@@ -681,14 +768,18 @@ namespace Syntrix.Api
     /// <summary>Vanilla check box with text; Changed gives "1" or "0".</summary>
     public sealed class GuiCheckBox : GuiTextNode
     {
+        /// <summary>Pressed state (toggle buttons, check boxes).</summary>
         public bool Checked { get { return GetBool(GuiProp.Checked); } set { SetBool(GuiProp.Checked, value); } }
     }
 
     /// <summary>Vanilla slider; Changed gives the value.</summary>
     public sealed class GuiSlider : GuiTextNode
     {
+        /// <summary>Current value.</summary>
         public float Value { get { return GetFloat(GuiProp.Value); } set { SetFloat(GuiProp.Value, value); } }
+        /// <summary>Smallest value.</summary>
         public float Min { get { return GetFloat(GuiProp.Min); } set { SetFloat(GuiProp.Min, value); } }
+        /// <summary>Largest value.</summary>
         public float Max { get { return GetFloat(GuiProp.Max); } set { SetFloat(GuiProp.Max, value); } }
         /// <summary>Raster, 0 = free.</summary>
         public float Step { get { return GetFloat(GuiProp.Step); } set { SetFloat(GuiProp.Step, value); } }
@@ -699,6 +790,7 @@ namespace Syntrix.Api
     /// <summary>Progress bar 0..1; Color is the fill.</summary>
     public sealed class GuiProgressBar : GuiTextNode
     {
+        /// <summary>Current value.</summary>
         public float Value { get { return GetFloat(GuiProp.Value); } set { SetFloat(GuiProp.Value, value); } }
     }
 
@@ -734,6 +826,7 @@ namespace Syntrix.Api
         /// <summary>Also report mouse moves (event Mouse with kind 2).</summary>
         public bool ReportMoves { set { SetBool(GuiProp.MouseMove, value); } }
 
+        /// <summary>Sets the drawing function (rectangle x, y, width, height in screen pixels; scale).</summary>
         public void SetDraw(Action<Vector4, float> draw) { if (IsValid && Gui.SetDraw_ != null) Gui.SetDraw_(Handle, draw); }
     }
 }

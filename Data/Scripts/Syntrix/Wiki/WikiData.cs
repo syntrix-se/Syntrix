@@ -265,9 +265,9 @@ namespace Syntrix.Wiki
                     continue;
                 var target = e.Page?.Trim();
                 var blockId = e.Block?.Trim();
-                if (string.IsNullOrEmpty(target) && string.IsNullOrEmpty(blockId))
+                if (string.IsNullOrEmpty(target) && string.IsNullOrEmpty(blockId) && string.IsNullOrWhiteSpace(e.De) && string.IsNullOrWhiteSpace(e.En))
                 {
-                    Errors.Add($"{origin}: list entry without page and without block on page '{page.Id}'");
+                    Errors.Add($"{origin}: list entry without page, block and text on page '{page.Id}'");
                     continue;
                 }
                 block.Entries.Add(new WikiEntry
