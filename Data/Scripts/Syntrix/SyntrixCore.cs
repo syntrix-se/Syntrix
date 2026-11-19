@@ -299,6 +299,9 @@ namespace Syntrix
             d["Wiki.AddTables"] = new Action<Func<string, string, string, string, string, string>>(f => Wiki.AddTables(modName, f));
             d["Wiki.Context"] = new Func<string>(Wiki.Context);
             d["Wiki.Reload"] = new Action(Wiki.Reload);
+            d["Wiki.Planet"] = new Func<string, bool, string[]>(Wiki.Planet);
+            d["Wiki.Title"] = new Func<string, bool, string>(Wiki.Title);
+            d["Wiki.Text"] = new Func<string, string, bool, string>(WikiTexts.Get);
 
             return d;
         }

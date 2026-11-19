@@ -36,30 +36,41 @@ namespace Syntrix.Wiki
     //   </System>
     //   The system and every planet get a page (Id as given, moons below their planet),
     //   with values and ores from the PlanetGeneratorDefinition. Own texts with <Page Id="earth" Extend="true">.
-    //   If a page with that Id exists already, it stays and does not get the automatic tables.
+    //   Public planet definitions that no system lists get a page below the system page "planets" (Planets).
+    //   If a page with that Id exists already, it stays as written and gets the automatic tables appended.
     //
-    //   Automatic tables (content from the definitions of the loaded mods, no rows needed):
+    //   Automatic tables (Syntrix fills them from the definitions of the loaded mods, no rows needed):
     //     <Table Auto="Ores" />                          refinery: ore to ingot per kg, which refineries
     //     <Table Auto="Components" />                    components and their cost
     //     <Table Auto="Planets" System="sol" />          planets of a system with gravity, atmosphere, temperature
     //     <Table Auto="OresPerPlanet" System="sol" />    which ores on which body
     //     <Table Auto="OresPerPlanet" Planet="earth" />  ores of one body with depth
     //     <Table Auto="PlanetData" Planet="earth" />     values of one body
-    //   Which Auto names exist depends on the mods that provide them (Syntrix API Wiki.AddTables).
+    //     <Table Auto="Recipes" />                       everything edible that can be made, with ingredients and effect
+    //   Further Auto names come from the mods that provide them (Syntrix API Wiki.AddTables).
     //
     //   Link lists in columns, with icons (item icons); a click opens the page:
     //     <List Auto="Ores" Columns="3" />               all ores (each ore has its own page ore-<subtype>)
     //     <List Auto="Components" />                     all components (each has a page component-<subtype>)
     //     <List Auto="OresPerPlanet" Planet="earth" />   ores of one body with depth
+    //     <List Auto="Ingredients" />                    everything edible except MealPack_…, with its effect
+    //     <List Auto="Meals" />                          MealPack_… that can be made
+    //     <List Auto="Spoiled" />                        MealPack_… that are not public (finds only)
+    //     <List Auto="Seeds" />                          all seeds
     //     <List Columns="2"><Entry Page="ores" de="Erze" en="Ores" /></List>   by hand
     //   Ore and component pages are created automatically below "ores" and "components". Own texts
     //   with <Page Id="ore-copper" Extend="true">.
+    //
+    //   Generated lists and pages show public definitions only. What a wiki file names itself (Block=, Icons=,
+    //   pages, entries) always shows, public or not. Exceptions for the generated lists:
+    //     <Hide Id="ConsumableItem/ClangCola" />          leaves a public item out
+    //     <Show Id="Ingot/Scrap" />                       takes a hidden item in
     //
     // Extend="true" on a page that does not exist (its mod is not loaded) is dropped without an error page,
     //   only with a log line. So every mod can append sentences and links to pages of other mods without the
     //   other mod having to link back. The same applies to Parent= pointing to a missing page (page moves to the top).
     // Block="Reactor/SyxLargeBlockLargeCoalReactor" on a list entry (Page= may then be missing) or on the page:
-    //   icon of the block (its first definition icon; a TransparentMaterial "SyxWikiIcon_<path>" is used if present).
+    //   icon of the block, drawn from its definition id.
     // Level (optional): important = yellow with tag "Wichtig", new = tag "Neu". Without it normal.
     //   "Neu" disappears for each player as soon as he has opened the page, and for everybody after
     //   NewUntil="2026-12-01" (YYYY-MM-DD). A new NewUntil date shows the tag again.
@@ -99,5 +110,13 @@ namespace Syntrix.Wiki
         /// <summary>Problems reported by a generating mod (shown on the error page).</summary>
         [XmlElement("Error")]
         public List<string> Errors = new List<string>();
+
+        /// <summary>Public definitions the generated lists leave out ("Type/Subtype").</summary>
+        [XmlElement("Hide")]
+        public List<DefinitionRefXml> Hide = new List<DefinitionRefXml>();
+
+        /// <summary>Hidden definitions the generated lists take in ("Type/Subtype").</summary>
+        [XmlElement("Show")]
+        public List<DefinitionRefXml> Show = new List<DefinitionRefXml>();
     }
 }

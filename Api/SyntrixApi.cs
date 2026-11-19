@@ -229,6 +229,9 @@ namespace Syntrix.Api
         private Action<Func<string, string>> _wikiAddSource;
         private Action<Func<string, string, string, string, string, string>> _wikiAddTables;
         private Func<string> _wikiContext;
+        private Func<string, bool, string[]> _wikiPlanet;
+        private Func<string, bool, string> _wikiTitle;
+        private Func<string, string, bool, string> _wikiText;
 
         private void Bind()
         {
@@ -267,6 +270,9 @@ namespace Syntrix.Api
             _wikiAddTables = Get<Action<Func<string, string, string, string, string, string>>>("Wiki.AddTables");
             _wikiContext = Get<Func<string>>("Wiki.Context");
             _wikiReload = Get<Action>("Wiki.Reload");
+            _wikiPlanet = Get<Func<string, bool, string[]>>("Wiki.Planet");
+            _wikiTitle = Get<Func<string, bool, string>>("Wiki.Title");
+            _wikiText = Get<Func<string, string, bool, string>>("Wiki.Text");
         }
 
         // ---------- info ----------
@@ -512,6 +518,29 @@ namespace Syntrix.Api
 
         /// <summary>API 3. Builds the wiki again on its next opening (e.g. after generated pages changed).</summary>
         public void WikiReload() { if (_wikiReload != null) _wikiReload(); }
+
+        /// <summary>
+        /// API 3. A planet of the wiki for an exact or partial planet definition subtype (e.g. "Earth" finds "Sol-Earth"):
+        /// [0] page id, [1] name, [2] image material ("" if none or not loaded), [3] image credit, [4] facts text,
+        /// [5] short line with gravity, atmosphere and temperature. Null if no planet matches (players only).
+        /// </summary>
+        /// <param name="definition">Planet definition subtype or a part of it.</param>
+        /// <param name="german">True for German texts.</param>
+        public string[] WikiPlanet(string definition, bool german) { return _wikiPlanet != null ? _wikiPlanet(definition, german) : null; }
+
+        /// <summary>API 3. Title of a wiki page in the language, null if the page does not exist (players only).</summary>
+        /// <param name="page">Page id.</param>
+        /// <param name="german">True for the German title.</param>
+        public string WikiTitle(string page, bool german) { return _wikiTitle != null ? _wikiTitle(page, german) : null; }
+
+        /// <summary>
+        /// API 3. A text key in the wanted language, independent of the game language (the wiki shows both): read from
+        /// Data/Localization/&lt;file&gt;.resx (English) or &lt;file&gt;.de.resx (German) of every loaded mod; null if no mod has it.
+        /// </summary>
+        /// <param name="file">Base name of the resx file, e.g. "MyTexts_GridCore".</param>
+        /// <param name="key">Text key.</param>
+        /// <param name="german">True for German.</param>
+        public string WikiText(string file, string key, bool german) { return _wikiText != null ? _wikiText(file, key, german) : null; }
 
         // ---------- settings ----------
 

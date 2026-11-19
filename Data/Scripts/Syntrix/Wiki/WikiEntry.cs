@@ -16,7 +16,7 @@ namespace Syntrix.Wiki
         /// <summary>Quiet second text in English.</summary>
         public string ExtraEn;
 
-        /// <summary>Icon of this block ("Type/Subtype"), resolved in WikiForeign.ResolveBlockIcons.</summary>
+        /// <summary>Icon of this block ("Type/Subtype"), drawn from its definition id.</summary>
         public string Block;
 
         /// <summary>Material names of the icons, drawn on top of each other (e.g. LQ mark on the ore).</summary>
