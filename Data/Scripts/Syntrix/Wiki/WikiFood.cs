@@ -94,7 +94,7 @@ namespace Syntrix.Wiki
                 string group = !meal ? "ingredients" : (visible ? "meals" : "spoiled");
                 if (group != kind || (!meal && !visible))
                     continue;
-                if (group == "spoiled" && data.Hidden.Contains(WikiAuto.Key(c.Id)))
+                if (group == "spoiled" && WikiData.Names(data.Hidden, WikiAuto.Key(c.Id)))
                     continue;
                 block.Entries.Add(new WikiEntry
                 {
