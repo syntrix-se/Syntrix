@@ -430,20 +430,40 @@ namespace Syntrix.Wiki
             }
         }
 
+        /// <summary>
+        /// Block definition by type (without MyObjectBuilder_) and subtype. Many vanilla blocks have an empty
+        /// subtype (Door, AirVent, Passage, …), the direct lookup misses them, so those are searched by name.
+        /// </summary>
+        private static MyCubeBlockDefinition FindBlock(string type, string subtype)
+        {
+            MyDefinitionId id;
+            MyCubeBlockDefinition def;
+            if (subtype.Length > 0 && MyDefinitionId.TryParse("MyObjectBuilder_" + type, subtype, out id)
+                && MyDefinitionManager.Static.TryGetCubeBlockDefinition(id, out def) && def != null)
+                return def;
+            var fullType = "MyObjectBuilder_" + type;
+            foreach (var d in MyDefinitionManager.Static.GetAllDefinitions())
+            {
+                var cube = d as MyCubeBlockDefinition;
+                if (cube != null && string.Equals(cube.Id.TypeId.ToString(), fullType, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(cube.Id.SubtypeName ?? "", subtype, StringComparison.OrdinalIgnoreCase))
+                    return cube;
+            }
+            return null;
+        }
+
         private static string[] BlockIcon(WikiData data, string pageId, string block)
         {
             try
             {
                 var parts = block.Split('/');
-                MyDefinitionId id;
-                MyCubeBlockDefinition def;
-                if (parts.Length != 2 || !MyDefinitionId.TryParse("MyObjectBuilder_" + parts[0].Trim(), parts[1].Trim(), out id)
-                    || !MyDefinitionManager.Static.TryGetCubeBlockDefinition(id, out def) || def == null)
+                var def = parts.Length == 2 ? FindBlock(parts[0].Trim(), parts[1].Trim()) : null;
+                if (def == null)
                 {
                     data.Errors.Add($"Page '{pageId}': block '{block}' does not exist");
                     return null;
                 }
-                return new[] { id.TypeId.ToString() + "/" + id.SubtypeName };
+                return new[] { def.Id.TypeId.ToString() + "/" + def.Id.SubtypeName };
             }
             catch (Exception e)
             {
