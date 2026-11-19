@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1 (API version 3)
+
+- Materials `SyxGui_GridLarge` and `SyxGui_GridSmall`: the grid size symbols of the G menu, for icons
+  in lists of grids.
+
 ## 1.2.0 (API version 3)
 
 Dock files of API versions 1 and 2 keep working. No endpoint was removed; the `Ui.*` endpoints of
