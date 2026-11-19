@@ -7,7 +7,9 @@ using VRage;
 using VRage.Game;
 using VRage.Game.Components;
 using VRage.Game.ModAPI;
-using Syntrix.Ui;
+using Syntrix.Gui;
+using Syntrix.Use;
+using Syntrix.Wiki;
 using VRage.Utils;
 using VRageMath;
 
@@ -42,8 +44,13 @@ namespace Syntrix
         public EventBus Events;
         /// <summary>Settings service.</summary>
         public SettingsService Settings;
-        /// <summary>UI service.</summary>
-        public UiService Ui;
+        /// <summary>Window service.</summary>
+        public GuiService Gui;
+        /// <summary>F action service.</summary>
+        public UseService Use;
+
+        /// <summary>In-game wiki (API 3).</summary>
+        public WikiService Wiki;
 
         private readonly Dictionary<string, int> _docked = new Dictionary<string, int>();
         private string _instanceKey;
@@ -77,11 +84,14 @@ namespace Syntrix
             Blocks = new BlockStore(this);
             Chat = new ChatCommands(this);
             Settings = new SettingsService(this);
-            Ui = new UiService(this);
+            Gui = new GuiService(this);
+            Use = new UseService();
+            Wiki = new WikiService(this);
             Net.Start();
             Blocks.Start();
             Chat.Start();
             Settings.Start();
+            Wiki.Start();
             Started = true;
 
             Log.Info("Syntrix " + Protocol.VersionText + " (API " + Protocol.ApiVersion + ") started, " + (IsServer ? "server" : "client") + (IsPlayer ? " with player" : ""));
@@ -95,7 +105,9 @@ namespace Syntrix
             if (Started)
             {
                 MyAPIGateway.Utilities.SendModMessage(Protocol.ApiChannel, new MyTuple<string, int>(Protocol.TagBye, Protocol.ApiVersion));
-                Ui.Stop();
+                Wiki.Stop();
+                Gui.Stop();
+                Use.Stop();
                 Settings.Stop();
                 Events.Stop();
                 Chat.Stop();
@@ -225,60 +237,132 @@ namespace Syntrix
 
             d["Notify.Player"] = new Action<ulong, string, string, string[], int, string>((id, key, fallback, args, ms, font) => Net.SendNotify(id, key, fallback, args, ms, font));
 
-            // API 2: UI service (players with Rich HUD Master only; elsewhere State is -1 and the rest does nothing)
-            var ui = Ui.Client(modName);
-            d["Ui.State"] = new Func<int>(() => Ui.State);
-            d["Ui.Events"] = new Action<Action<int, int, string>>(h => Ui.SetDispatcher(ui, h));
-            d["Ui.Release"] = new Action(() => ui.Release());
-            d["Ui.Create"] = new Func<int, int, int>((kind, parent) => ui.Create(kind, parent));
-            d["Ui.Remove"] = new Action<int>(h => ui.Remove(h));
-            d["Ui.Clear"] = new Action<int>(h => ui.Clear(h));
-            d["Ui.SetParent"] = new Action<int, int>((h, parent) => ui.SetParent(h, parent));
-            d["Ui.Part"] = new Func<int, int, int>((h, part) => ui.Part(h, part));
-            d["Ui.Listen"] = new Action<int, int, bool>((h, ev, on) => ui.Listen(h, ev, on));
-            d["Ui.SetBool"] = new Action<int, int, bool>(ui.SetBool);
-            d["Ui.SetInt"] = new Action<int, int, int>(ui.SetInt);
-            d["Ui.SetFloat"] = new Action<int, int, float>(ui.SetFloat);
-            d["Ui.SetVector"] = new Action<int, int, Vector2>(ui.SetVector);
-            d["Ui.SetColor"] = new Action<int, int, Color>(ui.SetColor);
-            d["Ui.SetText"] = new Action<int, int, string>(ui.SetText);
-            d["Ui.GetBool"] = new Func<int, int, bool>(ui.GetBool);
-            d["Ui.GetInt"] = new Func<int, int, int>(ui.GetInt);
-            d["Ui.GetFloat"] = new Func<int, int, float>(ui.GetFloat);
-            d["Ui.GetVector"] = new Func<int, int, Vector2>(ui.GetVector);
-            d["Ui.GetColor"] = new Func<int, int, Color>(ui.GetColor);
-            d["Ui.GetText"] = new Func<int, int, string>(ui.GetText);
-            d["Ui.Focus"] = new Action<int>(h => ui.Focus(h));
-            d["Ui.Measure"] = new Func<int, string, float, Vector2>((h, text, wrap) => ui.Measure(h, text, wrap));
-            d["Ui.Screen"] = new Func<Vector2>(() => Ui.ScreenSize);
-            d["Ui.ResScale"] = new Func<float>(() => Ui.ResScale);
-            d["Ui.CursorPos"] = new Func<Vector2>(() => Ui.CursorPosition);
-            d["Ui.Cursor"] = new Action<bool>(on => ui.WantsCursor = on);
-            d["Ui.Bind"] = new Action<string, string>((name, keys) => ui.Bind(name, keys));
-            d["Ui.BindKeys"] = new Func<string, string>(name => ui.BindKeys(name));
-            d["Ui.BindPage"] = new Action<string>(title => ui.BindPage(title));
-            d["Ui.ItemInsert"] = new Func<int, int, string, string, int>(ui.ItemInsert);
-            d["Ui.ItemRemove"] = new Action<int, int>(ui.ItemRemove);
-            d["Ui.ItemText"] = new Action<int, int, string>(ui.ItemText);
-            d["Ui.ItemEnabled"] = new Action<int, int, bool>(ui.ItemEnabled);
-            d["Ui.ItemKey"] = new Func<int, int, string>(ui.ItemKey);
-            d["Ui.ItemFind"] = new Func<int, string, int>(ui.ItemFind);
-            d["Ui.SetVector3"] = new Action<int, int, Vector3D>(ui.SetVector3);
-            d["Ui.GetVector3"] = new Func<int, int, Vector3D>(ui.GetVector3);
-            d["Ui.SetMatrix"] = new Action<int, MatrixD>(ui.SetMatrix);
-            d["Ui.SetPoints"] = new Action<int, Vector2[], int[]>(ui.SetPoints);
-            d["Ui.Clipboard"] = new Func<string>(() => Ui.Clipboard);
-            d["Ui.SetClipboard"] = new Action<string>(text => Ui.Clipboard = text);
-            d["Ui.Terminal"] = new Action<int>(h =>
+            // API 2: UI service on Rich HUD. Removed in 1.2 (moved to the module Syntrix.RichHud); the names stay and
+            // report "not available" (State -1), everything else does nothing.
+            AddOldUi(d, modName);
+
+            // API 3: window service in the Vanilla style (players only; on dedicated servers State is -1)
+            var gui = Gui.Client(modName);
+            d["Gui.State"] = new Func<int>(() => Gui.State);
+            d["Gui.Events"] = new Action<Action<int, int, int, string>>(h => gui.SetHandler(h));
+            d["Gui.Release"] = new Action(() => gui.Release());
+            d["Gui.Create"] = new Func<int, int, int>((kind, parent) => gui.Create(kind, parent));
+            d["Gui.Remove"] = new Action<int>(h => gui.Remove(h));
+            d["Gui.Clear"] = new Action<int>(h => gui.Clear(h));
+            d["Gui.SetParent"] = new Action<int, int>((h, parent) => gui.SetParent(h, parent));
+            d["Gui.SetBool"] = new Action<int, int, bool>(gui.SetBool);
+            d["Gui.SetInt"] = new Action<int, int, int>(gui.SetInt);
+            d["Gui.SetFloat"] = new Action<int, int, float>(gui.SetFloat);
+            d["Gui.SetVector"] = new Action<int, int, Vector2>(gui.SetVector);
+            d["Gui.SetColor"] = new Action<int, int, Color>(gui.SetColor);
+            d["Gui.SetText"] = new Action<int, int, string>(gui.SetText);
+            d["Gui.GetBool"] = new Func<int, int, bool>(gui.GetBool);
+            d["Gui.GetInt"] = new Func<int, int, int>(gui.GetInt);
+            d["Gui.GetFloat"] = new Func<int, int, float>(gui.GetFloat);
+            d["Gui.GetVector"] = new Func<int, int, Vector2>(gui.GetVector);
+            d["Gui.GetColor"] = new Func<int, int, Color>(gui.GetColor);
+            d["Gui.GetText"] = new Func<int, int, string>(gui.GetText);
+            d["Gui.ItemAdd"] = new Func<int, string, string, string, string, int>(gui.ItemAdd);
+            d["Gui.ItemSet"] = new Action<int, int, int, string>(gui.ItemSet);
+            d["Gui.ItemRemove"] = new Action<int, int>(gui.ItemRemove);
+            d["Gui.ItemClear"] = new Action<int>(gui.ItemClear);
+            d["Gui.ItemCount"] = new Func<int, int>(gui.ItemCount);
+            d["Gui.ItemFind"] = new Func<int, string, int>(gui.ItemFind);
+            d["Gui.Expand"] = new Action<int, int>(gui.Expand);
+            d["Gui.ScrollTo"] = new Action<int, int>(gui.ScrollTo);
+            d["Gui.Open"] = new Func<int, bool>(gui.Open);
+            d["Gui.Close"] = new Action<int>(gui.Close);
+            d["Gui.Focus"] = new Action<int>(gui.Focus);
+            d["Gui.SetDraw"] = new Action<int, Action<Vector4, float>>(gui.SetDraw);
+            d["Gui.Measure"] = new Func<string, string, float, Vector2>(GuiService.Measure);
+            d["Gui.Screen"] = new Func<Vector2>(() => GuiService.ScreenReference);
+            d["Gui.Scale"] = new Func<float>(() => { GuiDraw.UpdateScale(); return GuiDraw.K; });
+            d["Gui.Cursor"] = new Func<Vector2>(() =>
             {
-                if (h > 0) ui.OpenTerminal(h);
-                else Ui.Terminal(h);
+                Vector2 p;
+                GuiDraw.UpdateScale();
+                return IsPlayer && MyScreenSpace.TryGetCursorPositionPixels(out p) ? p / GuiDraw.K : new Vector2(-1f, -1f);
             });
-            d["Ui.TerminalOpen"] = new Func<bool>(() => Ui.TerminalIsOpen);
-            d["Ui.ScreenInfo"] = new Func<int, float>(what => Ui.ScreenInfo(what));
-            d["Ui.CursorWorld"] = new Func<Vector3D>(() => Ui.CursorWorld);
+            d["Gui.Confirm"] = new Func<string, string, string, string, Action<bool>, bool>(Gui.Confirm);
+            d["Gui.WindowCount"] = new Func<int>(() => Gui.WindowCount);
+
+            // API 3: own F action for blocks (UseObjectTypeOverride "syntrix")
+            d["Use.Register"] = new Action<string, string, Action<long, int>>((block, hint, h) => Use.Register(modName, block, hint, h));
+            d["Use.Unregister"] = new Action<string>(block => Use.Unregister(modName, block));
+
+            // Wiki (API 3)
+            d["Wiki.Open"] = new Func<string, bool>(Wiki.Open);
+            d["Wiki.Close"] = new Action(Wiki.Close);
+            d["Wiki.IsOpen"] = new Func<bool>(() => Wiki.IsOpen);
+            d["Wiki.OnClosed"] = new Action<Action>(h => Wiki.OnClosed(modName, h));
+            d["Wiki.AddSource"] = new Action<Func<string, string>>(f => Wiki.AddSource(modName, f));
+            d["Wiki.AddTables"] = new Action<Func<string, string, string, string, string, string>>(f => Wiki.AddTables(modName, f));
+            d["Wiki.Context"] = new Func<string>(Wiki.Context);
+            d["Wiki.Reload"] = new Action(Wiki.Reload);
 
             return d;
+        }
+
+        private bool _oldUiHinted;
+
+        /// <summary>The API 2 names of the Rich HUD UI service: kept, State -1, the rest does nothing.</summary>
+        private void AddOldUi(Dictionary<string, Delegate> d, string modName)
+        {
+            d["Ui.State"] = new Func<int>(() =>
+            {
+                if (IsPlayer && !_oldUiHinted)
+                {
+                    _oldUiHinted = true;
+                    Log.Warn(modName + " asks for the Rich HUD UI service (Ui.*, API 2). Since Syntrix 1.2 it is not part of Syntrix: "
+                        + "use the window service (Gui.*, API 3) or build in the module Syntrix.RichHud. The Ui.* calls do nothing.");
+                }
+                return -1;
+            });
+            d["Ui.Events"] = new Action<Action<int, int, string>>(h => { });
+            d["Ui.Release"] = new Action(() => { });
+            d["Ui.Create"] = new Func<int, int, int>((kind, parent) => 0);
+            d["Ui.Remove"] = new Action<int>(h => { });
+            d["Ui.Clear"] = new Action<int>(h => { });
+            d["Ui.SetParent"] = new Action<int, int>((h, parent) => { });
+            d["Ui.Part"] = new Func<int, int, int>((h, part) => 0);
+            d["Ui.Listen"] = new Action<int, int, bool>((h, ev, on) => { });
+            d["Ui.SetBool"] = new Action<int, int, bool>((h, p, v) => { });
+            d["Ui.SetInt"] = new Action<int, int, int>((h, p, v) => { });
+            d["Ui.SetFloat"] = new Action<int, int, float>((h, p, v) => { });
+            d["Ui.SetVector"] = new Action<int, int, Vector2>((h, p, v) => { });
+            d["Ui.SetColor"] = new Action<int, int, Color>((h, p, v) => { });
+            d["Ui.SetText"] = new Action<int, int, string>((h, p, v) => { });
+            d["Ui.GetBool"] = new Func<int, int, bool>((h, p) => false);
+            d["Ui.GetInt"] = new Func<int, int, int>((h, p) => 0);
+            d["Ui.GetFloat"] = new Func<int, int, float>((h, p) => 0f);
+            d["Ui.GetVector"] = new Func<int, int, Vector2>((h, p) => Vector2.Zero);
+            d["Ui.GetColor"] = new Func<int, int, Color>((h, p) => Color.Transparent);
+            d["Ui.GetText"] = new Func<int, int, string>((h, p) => null);
+            d["Ui.Focus"] = new Action<int>(h => { });
+            d["Ui.Measure"] = new Func<int, string, float, Vector2>((h, text, wrap) => Vector2.Zero);
+            d["Ui.Screen"] = new Func<Vector2>(() => Vector2.Zero);
+            d["Ui.ResScale"] = new Func<float>(() => 1f);
+            d["Ui.CursorPos"] = new Func<Vector2>(() => Vector2.Zero);
+            d["Ui.Cursor"] = new Action<bool>(on => { });
+            d["Ui.Bind"] = new Action<string, string>((name, keys) => { });
+            d["Ui.BindKeys"] = new Func<string, string>(name => null);
+            d["Ui.BindPage"] = new Action<string>(title => { });
+            d["Ui.ItemInsert"] = new Func<int, int, string, string, int>((h, i, text, key) => -1);
+            d["Ui.ItemRemove"] = new Action<int, int>((h, i) => { });
+            d["Ui.ItemText"] = new Action<int, int, string>((h, i, text) => { });
+            d["Ui.ItemEnabled"] = new Action<int, int, bool>((h, i, on) => { });
+            d["Ui.ItemKey"] = new Func<int, int, string>((h, i) => null);
+            d["Ui.ItemFind"] = new Func<int, string, int>((h, key) => -1);
+            d["Ui.SetVector3"] = new Action<int, int, Vector3D>((h, p, v) => { });
+            d["Ui.GetVector3"] = new Func<int, int, Vector3D>((h, p) => Vector3D.Zero);
+            d["Ui.SetMatrix"] = new Action<int, MatrixD>((h, m) => { });
+            d["Ui.SetPoints"] = new Action<int, Vector2[], int[]>((h, pts, idx) => { });
+            d["Ui.Clipboard"] = new Func<string>(() => null);
+            d["Ui.SetClipboard"] = new Action<string>(text => { });
+            d["Ui.Terminal"] = new Action<int>(h => { });
+            d["Ui.TerminalOpen"] = new Func<bool>(() => false);
+            d["Ui.ScreenInfo"] = new Func<int, float>(what => 0f);
+            d["Ui.CursorWorld"] = new Func<Vector3D>(() => Vector3D.Zero);
         }
 
         /// <summary>Promote level of a player.</summary>

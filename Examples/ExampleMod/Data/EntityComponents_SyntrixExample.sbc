@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Syntrix example: the use points of the block take the Syntrix use object ("syntrix"): F runs the action a mod
+     registered with UseRegister, K opens the terminal. The power check keeps the Vanilla behaviour without power. -->
+<Definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <EntityComponents>
+    <EntityComponent xsi:type="MyObjectBuilder_UseObjectsComponentDefinition">
+      <Id>
+        <TypeId>UseObjectsComponent</TypeId>
+        <SubtypeId>SyntrixExample_Use</SubtypeId>
+      </Id>
+      <LoadFromModel>true</LoadFromModel>
+      <UseObjectTypeOverride>syntrix</UseObjectTypeOverride>
+    </EntityComponent>
+  </EntityComponents>
+  <EntityContainers>
+    <Container>
+      <Id>
+        <TypeId>FunctionalBlock</TypeId>
+        <SubtypeId>SyntrixExample_Terminal</SubtypeId>
+      </Id>
+      <DefaultComponents>
+        <Component BuilderType="MyObjectBuilder_BlockPowerCheckComponent" SubtypeId="ElectricityPoweredBlock" ForceCreate="true" />
+        <Component BuilderType="MyObjectBuilder_UseObjectsComponent" SubtypeId="SyntrixExample_Use" ForceCreate="true" />
+      </DefaultComponents>
+    </Container>
+  </EntityContainers>
+</Definitions>

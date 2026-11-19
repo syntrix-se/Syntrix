@@ -1,6 +1,6 @@
-// Syntrix dock file (API version 2, Syntrix 1.1.0). Copy this file into your mod's script folder.
+// Syntrix dock file (API version 3, Syntrix 1.2.0). Copy this file into your mod's script folder.
 // Do not edit it; take a newer copy from the Syntrix repository instead.
-// Windows and HUD elements: also copy the SyntrixUi*.cs files (optional UI dock files).
+// Windows and screen elements: also copy SyntrixGui.cs (optional dock file of the window service).
 //
 // This file deliberately holds several types (SyntrixApi, SyntrixFiles, SyntrixText, SyntrixLog,
 // SyntrixSliderScale, SyntrixControls) so that a mod copies exactly one file.
@@ -38,7 +38,7 @@ namespace Syntrix.Api
         public const long Channel = 8346120579001L;
 
         /// <summary>API version of this dock file.</summary>
-        public const int ApiVersion = 2;
+        public const int ApiVersion = 3;
 
         /// <summary>Prefix for notification arguments that are text keys themselves.</summary>
         public const char TextArgPrefix = '\u0001';
@@ -98,7 +98,7 @@ namespace Syntrix.Api
         }
 
         /// <summary>True if the running framework offers this endpoint.</summary>
-        /// <param name="key">Endpoint name, e.g. "Ui.State".</param>
+        /// <param name="key">Endpoint name, e.g. "Gui.State".</param>
         public bool Has(string key) { return _endpoints != null && _endpoints.ContainsKey(key); }
 
         private void SendRegistration()
@@ -182,7 +182,7 @@ namespace Syntrix.Api
             return _endpoints != null && _endpoints.TryGetValue(key, out d) ? d as T : null;
         }
 
-        /// <summary>API 2. For the other dock files (SyntrixUi): runs when the endpoints were (re)bound or dropped.</summary>
+        /// <summary>API 2. For the other dock files (SyntrixGui): runs when the endpoints were (re)bound or dropped.</summary>
         internal event Action EndpointsChanged;
 
         /// <summary>API 2. Endpoint by name for the other dock files, null if missing.</summary>
@@ -219,6 +219,16 @@ namespace Syntrix.Api
         private Func<ulong> _evSender;
         private Action<string, string> _setPublish;
         private Action<string, Action<string>> _setSubscribe;
+        // API 3
+        private Action<string, string, Action<long, int>> _useRegister;
+        private Action<string> _useUnregister;
+        private Func<string, bool> _wikiOpen;
+        private Action _wikiClose, _wikiReload;
+        private Func<bool> _wikiIsOpen;
+        private Action<Action> _wikiOnClosed;
+        private Action<Func<string, string>> _wikiAddSource;
+        private Action<Func<string, string, string, string, string, string>> _wikiAddTables;
+        private Func<string> _wikiContext;
 
         private void Bind()
         {
@@ -247,6 +257,16 @@ namespace Syntrix.Api
             _notify = Get<Action<ulong, string, string, string[], int, string>>("Notify.Player");
             _setPublish = Get<Action<string, string>>("Settings.Publish");
             _setSubscribe = Get<Action<string, Action<string>>>("Settings.Subscribe");
+            _useRegister = Get<Action<string, string, Action<long, int>>>("Use.Register");
+            _useUnregister = Get<Action<string>>("Use.Unregister");
+            _wikiOpen = Get<Func<string, bool>>("Wiki.Open");
+            _wikiClose = Get<Action>("Wiki.Close");
+            _wikiIsOpen = Get<Func<bool>>("Wiki.IsOpen");
+            _wikiOnClosed = Get<Action<Action>>("Wiki.OnClosed");
+            _wikiAddSource = Get<Action<Func<string, string>>>("Wiki.AddSource");
+            _wikiAddTables = Get<Action<Func<string, string, string, string, string, string>>>("Wiki.AddTables");
+            _wikiContext = Get<Func<string>>("Wiki.Context");
+            _wikiReload = Get<Action>("Wiki.Reload");
         }
 
         // ---------- info ----------
@@ -439,6 +459,59 @@ namespace Syntrix.Api
         /// <summary>Marks a notification argument as a text key that each player translates.</summary>
         /// <param name="key">Text key.</param>
         public static string TextArg(string key) { return TextArgPrefix + key; }
+
+        // ---------- F action (API 3) ----------
+
+        /// <summary>
+        /// API 3. Own F action for a block type. The block needs a UseObjectsComponent with UseObjectTypeOverride
+        /// "syntrix" in its definition (see Examples); K still opens the Vanilla terminal. Players only.
+        /// </summary>
+        /// <param name="blockKey">"TypeId/SubtypeId" without "MyObjectBuilder_", e.g. "TerminalBlock/MyPanel".</param>
+        /// <param name="hintKey">Text key (MyTexts) of the hint shown while aiming at the block; "{0}" is the key, null = "Use".</param>
+        /// <param name="handler">Runs on the player who pressed F: (block entity id, action 0).</param>
+        public void UseRegister(string blockKey, string hintKey, Action<long, int> handler) { WhenReady(() => { if (_useRegister != null) _useRegister(blockKey, hintKey, handler); }); }
+
+        /// <summary>API 3. Removes the F action of a block type (only the mod that registered it).</summary>
+        /// <param name="blockKey">"TypeId/SubtypeId" as given to <see cref="UseRegister"/>.</param>
+        public void UseUnregister(string blockKey) { if (_useUnregister != null) _useUnregister(blockKey); }
+
+        // ---------- wiki (API 3) ----------
+
+        /// <summary>API 3. Opens the wiki (players only); false if it could not open.</summary>
+        /// <param name="page">Page id to show, null = the last page.</param>
+        public bool WikiOpen(string page = null) { return _wikiOpen != null && _wikiOpen(page); }
+
+        /// <summary>API 3. Closes the wiki window.</summary>
+        public void WikiClose() { if (_wikiClose != null) _wikiClose(); }
+
+        /// <summary>API 3. True while the wiki window is open.</summary>
+        public bool WikiIsOpen { get { return _wikiIsOpen != null && _wikiIsOpen(); } }
+
+        /// <summary>API 3. Runs when the wiki window closes (one handler per mod; null removes it).</summary>
+        /// <param name="handler">Handler without arguments.</param>
+        public void WikiOnClosed(Action handler) { WhenReady(() => { if (_wikiOnClosed != null) _wikiOnClosed(handler); }); }
+
+        /// <summary>
+        /// API 3. Generated pages: Syntrix calls the function when it builds the wiki, with the context as XML
+        /// (&lt;SyxWiki&gt; with all &lt;System&gt; lists and one &lt;Page Id Parent Order Source&gt; stub per page),
+        /// and merges the returned &lt;SyxWiki&gt; text like a wiki file (null or empty = nothing).
+        /// </summary>
+        /// <param name="source">Context XML in, wiki XML out; null removes it.</param>
+        public void WikiAddSource(Func<string, string> source) { WhenReady(() => { if (_wikiAddSource != null) _wikiAddSource(source); }); }
+
+        /// <summary>
+        /// API 3. Automatic tables and lists (Auto="..." in a wiki file): (kind "Table" or "List", auto, system id,
+        /// planet id, page id) → &lt;SyxWiki&gt;&lt;Page Id="_"&gt; with one &lt;Table&gt; or &lt;List&gt;, or null if the
+        /// Auto name is not yours.
+        /// </summary>
+        /// <param name="tables">Filler; null removes it.</param>
+        public void WikiAddTables(Func<string, string, string, string, string, string> tables) { WhenReady(() => { if (_wikiAddTables != null) _wikiAddTables(tables); }); }
+
+        /// <summary>API 3. The context XML (systems and page stubs of all wiki files), null without the framework or on a server.</summary>
+        public string WikiContext() { return _wikiContext != null ? _wikiContext() : null; }
+
+        /// <summary>API 3. Builds the wiki again on its next opening (e.g. after generated pages changed).</summary>
+        public void WikiReload() { if (_wikiReload != null) _wikiReload(); }
 
         // ---------- settings ----------
 
