@@ -1,0 +1,35 @@
+// Syntrix - shared services framework for Space Engineers mods.
+// MIT License, see LICENSE in the repository root.
+using System.Collections.Generic;
+using System.Xml.Serialization;
+
+namespace Syntrix.Wiki
+{
+    /// <summary>Element &lt;Table&gt; of a page, by hand or automatic.</summary>
+    public class TableXml : LangTextXml
+    {
+        /// <summary>Relative column widths, e.g. "2|1|3". Without: by text length.</summary>
+        [XmlAttribute("Widths")]
+        public string Widths;
+
+        /// <summary>Automatic table: Ores, Components, Planets, OresPerPlanet, PlanetData, Recipes (and those of the mods).</summary>
+        [XmlAttribute("Auto")]
+        public string Auto;
+
+        /// <summary>System id filter of an automatic table.</summary>
+        [XmlAttribute("System")]
+        public string SystemId;
+
+        /// <summary>Planet id filter of an automatic table.</summary>
+        [XmlAttribute("Planet")]
+        public string PlanetId;
+
+        /// <summary>Header row of a table made by hand.</summary>
+        [XmlElement("Header")]
+        public LangTextXml Header;
+
+        /// <summary>Rows of a table made by hand; cells separated by '|'.</summary>
+        [XmlElement("Row")]
+        public List<LangTextXml> Rows = new List<LangTextXml>();
+    }
+}

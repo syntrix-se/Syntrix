@@ -1,3 +1,0 @@
-Rich HUD Framework (Client + Shared) by Zach Hembree, MIT License (LICENSE.txt).
-Source: https://github.com/ZachHembree/RichHudFramework.Client, revision b4e6fed (14.08.2026).
-Do not edit by hand; replace only as a whole.

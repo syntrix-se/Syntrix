@@ -1,6 +1,6 @@
-// Smallest mod that docks to Syntrix. Copy Api/SyntrixApi.cs next to this file, and for the window and
-// the terminal page Api/SyntrixUi.cs, Api/SyntrixUi.Controls.cs and Api/SyntrixUi.Terminal.cs
-// (needs Rich HUD Master in the world).
+// Smallest mod that docks to Syntrix. Copy Api/SyntrixApi.cs next to this file, and for the window
+// Api/SyntrixGui.cs as well. The example block (Data/CubeBlocks_SyntrixExample.sbc and
+// Data/EntityComponents_SyntrixExample.sbc) shows the own F action.
 // MIT License, see LICENSE in the Syntrix repository.
 using System.Collections.Generic;
 using Sandbox.ModAPI;
@@ -20,17 +20,20 @@ namespace SyntrixExample
         private const string Mod = "SyntrixExample";
         private const string SettingsFile = "SyntrixExample.ini";
         private const string EventWatched = "SyntrixExample.DoorWatched";
+        private const string ExampleBlock = "FunctionalBlock/SyntrixExample_Terminal";
 
         private readonly SyntrixApi _syx = new SyntrixApi();
         private readonly SyntrixLog _log = new SyntrixLog(Mod);
         private string _greeting = "Hello";
 
-        // Window through the Syntrix UI service
-        private SyntrixUi _ui;
-        private UiWindow _window;
-        private UiLabel _status;
-        private UiTextField _name;
-        private UiDropdown _greetings;
+        // Window through the Syntrix window service (Vanilla look, players only)
+        private SyntrixGui _gui;
+        private GuiWindow _window;
+        private GuiLabel _status;
+        private GuiTextField _name;
+        private GuiDropdown _greetings;
+        private GuiProgressBar _bar;
+        private long _block;
         private int _clicks;
 
         /// <summary>Docks to Syntrix and registers controls, settings and events.</summary>
@@ -38,12 +41,13 @@ namespace SyntrixExample
         {
             _syx.Load(Mod, OnReady);
 
-            // UI: the window is built when Rich HUD is ready (again after a Rich HUD restart).
-            // F7 toggles it; players can change the key on the page "Syntrix Example" of the Rich HUD terminal (F2).
-            _ui = new SyntrixUi(_syx);
-            _ui.Load(BuildWindow);
-            _ui.Bind("ToggleWindow", "F7", () => { if (_window != null) _window.Toggle(); });
-            _ui.BindPage("Syntrix Example");
+            // The window service: elements can be made once it is available (again after Syntrix reloaded).
+            _gui = new SyntrixGui(_syx);
+            _gui.AvailabilityChanged += () => { _window = null; };
+
+            // Own F action: F on the example block opens the window, K still opens the Vanilla terminal.
+            // Players only. The hint is a text key (MyTexts, "{0}" = the key); null shows "[F] Use".
+            _syx.UseRegister(ExampleBlock, null, (entityId, action) => OpenWindow(entityId));
 
             // Terminal controls are only described here; Syntrix creates them when a door is first seen.
             SyntrixControls<IMyDoor>.Checkbox(_syx, "SyntrixExample_Watch", "SyntrixExample_Watch", "SyntrixExample_Watch_Tooltip",
@@ -71,126 +75,114 @@ namespace SyntrixExample
                 if (args != null && args.Length == 2 && _syx.IsPlayer)
                     MyAPIGateway.Utilities.ShowMessage(Mod, "Door " + args[0] + " watched: " + args[1]);
             });
+
+            // Wiki: fills an automatic table <Table Auto="SyntrixExample.Doors" /> in a Data/Syntrix-Wiki.xml (any mod).
+            _syx.WikiAddTables((kind, auto, system, planet, page) =>
+            {
+                if (auto != "SyntrixExample.Doors" || kind != "Table")
+                    return null;
+                return "<SyxWiki><Page Id=\"_\"><Table Widths=\"2|1\"><Header de=\"Tür|Bewacht\" en=\"Door|Watched\" />"
+                    + "<Row de=\"Haupttor|ja\" en=\"Main gate|yes\" /></Table></Page></SyxWiki>";
+            });
+        }
+
+        private void OpenWindow(long block)
+        {
+            _block = block;
+            if (!_gui.IsAvailable)
+                return;
+            if (_window == null || !_window.IsValid)
+                BuildWindow();
+            var b = MyAPIGateway.Entities.GetEntityById(block) as IMyTerminalBlock;
+            _window.Title = b != null ? b.CustomName : "Syntrix example";
+            _window.Open();
         }
 
         private void BuildWindow()
         {
-            _window = _ui.Window("[b]Syntrix example[/b]");
-            _window.Size = new Vector2(560f, 520f);
-            _window.HeaderColor = new Color(20, 26, 32, 250);
-            _window.BodyColor = new Color(28, 34, 41, 240);
+            // Vanilla terminal size by default; the content lies below the title band
+            _window = _gui.Window("Syntrix example");
+            var root = _window.AddStack(false, 10f);
+            root.FillWidth = true;
+            root.FillHeight = true;
 
-            // Formatted text with a link; it wraps at the window width and follows resizing
-            var text = _ui.Label(_window, "Text can be [b]bold[/b], [i]italic[/i], [color=#E8B931]coloured[/color] or [size=1.3]bigger[/size]."
-                + "\n[link=hello]This link[/link] writes into the status line.");
-            text.ParentAlign = UiAlign.InnerTopLeft;
-            text.Offset = new Vector2(16f, -12f);
-            text.WrapToParent(32f);
-            text.OnLink(target => _status.Text = "Link clicked: [b]" + SyntrixUi.Escape(target) + "[/b]");
-
-            // List: one panel per row, highlighted under the cursor, click copies the name
-            var list = _ui.ScrollBox(_window);
-            list.ParentAlign = UiAlign.InnerTopLeft;
-            list.Offset = new Vector2(16f, -90f);
-            list.Size = new Vector2(240f, 210f);
-            list.Color = new Color(18, 23, 29, 250);
-            foreach (var name in new[] { "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel" })
+            // Formatted text with links; it wraps at the available width
+            var text = root.AddLabel("Text can be [b]bright[/b], [i]quiet[/i], [color=#E8B931]coloured[/color] or [size=1.3]bigger[/size]."
+                + "\n[link=hello]This link[/link] writes into the status line, [link=wiki]this one[/link] opens the wiki.");
+            text.Link += target =>
             {
-                var row = _ui.Panel(list);
-                row.Height = 30f;
-                row.HighlightColor = new Color(40, 52, 62);
-                var label = _ui.Label(row, name);
-                label.ParentAlign = UiAlign.InnerLeft;
-                label.Offset = new Vector2(10f, 0f);
-                string n = name;
-                row.OnClick(() => _name.Text = n);
-            }
+                if (target == "wiki")
+                {
+                    _window.Close();
+                    _syx.WikiOpen();
+                }
+                else
+                    _status.Text = "Link clicked: [b]" + SyntrixGui.Escape(target) + "[/b]";
+            };
+
+            var row = root.AddStack(true, 16f);
+            row.FillWidth = true;
+
+            // List with icons (a definition id draws its icon): click copies the name
+            var list = row.AddList();
+            list.Size = new Vector2(300f, 260f);
+            foreach (var name in new[] { "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel" })
+                list.ItemAdd(name, name, "MyObjectBuilder_Component/SteelPlate");
+            list.Selected += (index, key) => _name.Text = key;
+
+            var side = row.AddStack(false, 10f);
+            side.FillWidth = true;
 
             // Text field: Enter greets
-            _name = _ui.TextField(_window);
-            _name.ParentAlign = UiAlign.InnerTopRight;
-            _name.Offset = new Vector2(-16f, -90f);
-            _name.Size = new Vector2(250f, 34f);
+            _name = side.AddTextField();
             _name.Placeholder = "Type a name ...";
             _name.MaxLength = 24;
-            _name.OnSubmit(t => _status.Text = Greeting() + ", [b]" + SyntrixUi.Escape(t) + "[/b]!");
+            _name.Submitted += t => _status.Text = Greeting() + ", [b]" + SyntrixGui.Escape(t) + "[/b]!";
 
-            // Drop-down: entries have a key (given back on selection) and a text with markup
-            _greetings = _ui.Dropdown(_window);
-            _greetings.ParentAlign = UiAlign.InnerTopRight;
-            _greetings.Offset = new Vector2(-16f, -140f);
-            _greetings.Size = new Vector2(250f, 30f);
-            _greetings.Add("settings", "[i]From the settings[/i]");
-            _greetings.Add("Hi", "Hi");
-            _greetings.Add("Good evening", "Good evening");
-            _greetings.SelectedIndex = 0;
-            _greetings.OnSelected(key => _status.Text = "Greeting: [b]" + SyntrixUi.Escape(Greeting()) + "[/b]");
+            // Drop-down: items have a key (given back on selection) and a text
+            _greetings = side.AddDropdown();
+            _greetings.ItemAdd("settings", "From the settings");
+            _greetings.ItemAdd("Hi", "Hi");
+            _greetings.ItemAdd("Good evening", "Good evening");
+            _greetings.Selection = 0;
+            _greetings.Selected += (index, key) => _status.Text = "Greeting: [b]" + SyntrixGui.Escape(Greeting()) + "[/b]";
 
-            // Tree box: the children are the entries; selecting one gives its handle
-            var tree = _ui.TreeBox(_window, "Fleet");
-            tree.ParentAlign = UiAlign.InnerTopRight;
-            tree.Offset = new Vector2(-16f, -190f);
-            tree.Size = new Vector2(250f, 30f);
-            var miner = _ui.Label(tree, "Miner");
-            _ui.Label(tree, "Hauler");
-            tree.OnSelected(h => _status.Text = h == miner.Handle ? "The miner is busy." : "The hauler waits.");
+            // Tree: items with a parent key below their parent
+            var tree = side.AddTree();
+            tree.Size = new Vector2(0f, 120f);
+            tree.FillWidth = true;
+            tree.ItemAdd("fleet", "Fleet");
+            tree.ItemAdd("miner", "Miner", null, "fleet");
+            tree.ItemAdd("hauler", "Hauler", null, "fleet");
+            tree.Selected += (index, key) => _status.Text = key == "miner" ? "The miner is busy." : key == "hauler" ? "The hauler waits." : "Two ships.";
 
-            // Progress bar drawn with a bare slider bar
-            var bar = _ui.SliderBar(_window);
-            bar.ParentAlign = UiAlign.InnerBottomLeft;
-            bar.Offset = new Vector2(16f, 64f);
-            bar.Size = new Vector2(240f, 12f);
-            bar.BarSize = new Vector2(240f, 12f);
-            bar.SliderVisible = false;
-            bar.InputEnabled = false;
-            bar.Percent = 0.4f;
+            // Table with header, relative widths and markup in the cells
+            var table = root.AddTable();
+            table.FillWidth = true;
+            table.SetHeader("Ship", "Cargo", "State");
+            table.SetWidths(2f, 1f, 1f);
+            table.AddRow("miner", "Miner", "[b]12 t[/b]", "[color=#78D26E]ready[/color]");
+            table.AddRow("hauler", "Hauler", "40 t", "[color=#E6504A]damaged[/color]");
 
-            var button = _ui.Button(_window, "Count");
-            button.ParentAlign = UiAlign.InnerBottomRight;
-            button.Offset = new Vector2(-16f, 16f);
-            button.Size = new Vector2(140f, 36f);
-            button.Color = new Color(24, 31, 38);
-            button.HighlightColor = new Color(34, 44, 53);
-            button.BorderThickness = 1f;
-            button.BorderColor = new Color(42, 52, 61);
-            button.OnClick(() =>
+            _bar = root.AddProgressBar();
+            _bar.Size = new Vector2(0f, 14f);
+            _bar.Value = 0.4f;
+
+            var buttons = root.AddStack(true, 10f);
+            buttons.AddButton("Count", () =>
             {
                 _status.Text = "Clicked [b]" + (++_clicks) + "[/b] times";
-                bar.Percent = (_clicks % 10) / 10f;
+                _bar.Value = (_clicks % 10) / 10f;
             });
-
-            _status = _ui.Label(_window, "Press " + (_ui.BindKeys("ToggleWindow") ?? "F7") + " to open and close.");
-            _status.ParentAlign = UiAlign.InnerBottomLeft;
-            _status.Offset = new Vector2(16f, 24f);
-
-            BuildTerminalPage();
-        }
-
-        // A page in the Rich HUD terminal (F2): category, control page, one row with a tile of controls, a text page.
-        private void BuildTerminalPage()
-        {
-            var category = _ui.TerminalCategory("Syntrix Example");
-            var page = category.ControlPage("Options");
-            var row = page.Category("Window", "Settings of the example window");
-            var tile = row.Tile();
-            var open = tile.CheckBox("Open the window");
-            open.Value = _window.Visible;
-            open.OnChanged(on => { if (on) _window.Open(); else _window.Close(); });
-            var size = tile.Slider("Width", 400f, 900f);
-            size.Value = _window.Width;
-            size.ValueText = ((int)size.Value).ToString();
-            size.OnChanged(v =>
+            buttons.AddButton("Ask", () => _gui.Confirm("Syntrix example", "Reset the counter?", "Yes", "No", yes =>
             {
-                _window.Width = v;
-                size.ValueText = ((int)v).ToString();
-            });
-            var color = tile.ColorPicker("Header colour");
-            color.Value = _window.HeaderColor;
-            color.OnChanged(c => _window.HeaderColor = c);
+                if (yes)
+                    _clicks = 0;
+                _status.Text = yes ? "Counter reset." : "Counter kept.";
+            }));
 
-            var help = category.TextPage("Help");
-            help.SubHeader = "What this example shows";
-            help.Body = "A window with a list, a text field, a drop-down, a tree and a progress bar, and this terminal page.";
+            _status = root.AddLabel("Esc closes the window, K on the block opens its terminal.");
+            _status.TextColor = new Color(150, 165, 175);
         }
 
         private string Greeting()
@@ -257,8 +249,9 @@ namespace SyntrixExample
         protected override void UnloadData()
         {
             SyntrixControls<IMyDoor>.Unload();
-            if (_ui != null)
-                _ui.Unload();
+            _syx.UseUnregister(ExampleBlock);
+            if (_gui != null)
+                _gui.Release();
             _syx.Unload();
         }
     }

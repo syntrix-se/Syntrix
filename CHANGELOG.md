@@ -1,5 +1,62 @@
 # Changelog
 
+## 1.2.0 (API version 3)
+
+Dock files of API versions 1 and 2 keep working. No endpoint was removed; the `Ui.*` endpoints of
+API 2 stay registered and report "not available".
+
+### Rich HUD removed
+
+- Syntrix no longer ships the Rich HUD client and no longer needs Rich HUD Master.
+- `Ui.*` (API 2): every endpoint is still there with its old signature; `Ui.State` returns -1, all
+  others do nothing. The game log tells once per session which mod still uses them.
+- The dock files `Api/SyntrixUi.cs`, `Api/SyntrixUi.Controls.cs` and `Api/SyntrixUi.Terminal.cs`
+  are gone. Their code and the Rich HUD client are kept as source in the module
+  [Syntrix.RichHud](https://github.com/syntrix-se/Syntrix.RichHud) for mods that include Rich HUD
+  themselves.
+
+### Window service (players only)
+
+- New optional dock file `Api/SyntrixGui.cs`.
+- Windows through the game's `MyModScreen` in the Vanilla style (Vanilla terminal size, title band,
+  close button, Esc, pause in single player), overlays on the screen without a window (layer below
+  or above the HUD, hidden with the HUD and in menus unless `ShowInMenus`).
+- Elements: panel, stack, scroll area, label (wrapping, markup, links), button, image, text field
+  (one or more lines), list (icons, columns, second text, badge), tree, table (header, relative
+  widths, markup and links in cells), check box, slider, progress bar, tabs, drop-down, drawing
+  area; tooltips; confirmation window.
+- Endpoints: `Gui.State`, `Gui.Events`, `Gui.Release`, `Gui.Create`, `Gui.Remove`, `Gui.Clear`,
+  `Gui.SetParent`, `Gui.SetBool`, `Gui.SetInt`, `Gui.SetFloat`, `Gui.SetVector`, `Gui.SetColor`,
+  `Gui.SetText`, `Gui.GetBool`, `Gui.GetInt`, `Gui.GetFloat`, `Gui.GetVector`, `Gui.GetColor`,
+  `Gui.GetText`, `Gui.ItemAdd`, `Gui.ItemSet`, `Gui.ItemRemove`, `Gui.ItemClear`, `Gui.ItemCount`,
+  `Gui.ItemFind`, `Gui.Expand`, `Gui.ScrollTo`, `Gui.Open`, `Gui.Close`, `Gui.Focus`, `Gui.SetDraw`,
+  `Gui.Measure`, `Gui.Screen`, `Gui.Scale`, `Gui.Cursor`, `Gui.Confirm`, `Gui.WindowCount`.
+
+### F action
+
+- Use object `syntrix` (UseObjectsComponent with `UseObjectTypeOverride`): F runs the action a mod
+  registered for the block type, K opens the Vanilla terminal.
+- Endpoints `Use.Register`, `Use.Unregister`; in the dock file `UseRegister`, `UseUnregister`.
+
+### Wiki
+
+- The in-game wiki moved into Syntrix (before: part of a content mod): F11 and `/syxwiki`
+  (`/syxwiki <page>`, `/syxwiki reload`), page tree with search, back and forward, path, language
+  switch, "new" and "important" marks, error page for authors.
+- Every loaded mod adds pages with `Data/Syntrix-Wiki.xml`; new attributes for generating mods
+  (`Icons`, `Source`, `ExtraDe`, `ExtraEn`, `<Profile>`, `<Error>`).
+- Pages and tables from the game definitions, for Vanilla and every mod: ore, component, system and
+  planet pages; tables `Ores`, `Components`, `Planets`, `OresPerPlanet`, `PlanetData`, `Recipes`;
+  lists `Ores`, `Components`, `OresPerPlanet`, `Ingredients`, `Meals`, `Spoiled`, `Seeds`. Public
+  planets that no `<System>` names go to the page "planets". Icons come from the definition ids.
+- Generated lists show public definitions only; `<Hide Id="Type/Subtype" />` and
+  `<Show Id="Type/Subtype" />` in a wiki file change that. A hand-written page with the id of a
+  generated one stays and gets the generated blocks appended.
+- Endpoints `Wiki.Open`, `Wiki.Close`, `Wiki.IsOpen`, `Wiki.OnClosed`, `Wiki.AddSource`,
+  `Wiki.AddTables`, `Wiki.Context`, `Wiki.Reload`, `Wiki.Planet`, `Wiki.Title`, `Wiki.Text`; in the
+  dock file `WikiOpen`, `WikiClose`, `WikiIsOpen`, `WikiOnClosed`, `WikiAddSource`, `WikiAddTables`,
+  `WikiContext`, `WikiReload`, `WikiPlanet`, `WikiTitle`, `WikiText`.
+
 ## 1.1.0 (API version 2)
 
 Dock files of API version 1 keep working; no endpoint or dock file method of 1.0.0 changed.

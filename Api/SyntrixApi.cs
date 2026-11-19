@@ -1,9 +1,9 @@
-// Syntrix dock file (API version 2, Syntrix 1.1.0). Copy this file into your mod's script folder.
+// Syntrix dock file (API version 3, Syntrix 1.2.0). Copy this file into your mod's script folder.
 // Do not edit it; take a newer copy from the Syntrix repository instead.
-// Windows and HUD elements: also copy the SyntrixUi*.cs files (optional UI dock files).
+// Windows and screen elements: also copy SyntrixGui.cs (optional dock file of the window service).
 //
-// This file deliberately holds several types (SyntrixApi, SyntrixFiles, SyntrixText, SyntrixLog,
-// SyntrixSliderScale, SyntrixControls) so that a mod copies exactly one file.
+// This file deliberately holds several types (SyntrixApi, SyntrixFiles, SyntrixText, SyntrixWikiXml,
+// SyntrixLog, SyntrixSliderScale, SyntrixControls) so that a mod copies exactly one file.
 //
 // MIT License - Copyright (c) 2026 Syntrix contributors
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this
@@ -38,7 +38,7 @@ namespace Syntrix.Api
         public const long Channel = 8346120579001L;
 
         /// <summary>API version of this dock file.</summary>
-        public const int ApiVersion = 2;
+        public const int ApiVersion = 3;
 
         /// <summary>Prefix for notification arguments that are text keys themselves.</summary>
         public const char TextArgPrefix = '\u0001';
@@ -98,7 +98,7 @@ namespace Syntrix.Api
         }
 
         /// <summary>True if the running framework offers this endpoint.</summary>
-        /// <param name="key">Endpoint name, e.g. "Ui.State".</param>
+        /// <param name="key">Endpoint name, e.g. "Gui.State".</param>
         public bool Has(string key) { return _endpoints != null && _endpoints.ContainsKey(key); }
 
         private void SendRegistration()
@@ -182,7 +182,7 @@ namespace Syntrix.Api
             return _endpoints != null && _endpoints.TryGetValue(key, out d) ? d as T : null;
         }
 
-        /// <summary>API 2. For the other dock files (SyntrixUi): runs when the endpoints were (re)bound or dropped.</summary>
+        /// <summary>API 2. For the other dock files (SyntrixGui): runs when the endpoints were (re)bound or dropped.</summary>
         internal event Action EndpointsChanged;
 
         /// <summary>API 2. Endpoint by name for the other dock files, null if missing.</summary>
@@ -219,6 +219,19 @@ namespace Syntrix.Api
         private Func<ulong> _evSender;
         private Action<string, string> _setPublish;
         private Action<string, Action<string>> _setSubscribe;
+        // API 3
+        private Action<string, string, Action<long, int>> _useRegister;
+        private Action<string> _useUnregister;
+        private Func<string, bool> _wikiOpen;
+        private Action _wikiClose, _wikiReload;
+        private Func<bool> _wikiIsOpen;
+        private Action<Action> _wikiOnClosed;
+        private Action<Func<string, string>> _wikiAddSource;
+        private Action<Func<string, string, string, string, string, string>> _wikiAddTables;
+        private Func<string> _wikiContext;
+        private Func<string, bool, string[]> _wikiPlanet;
+        private Func<string, bool, string> _wikiTitle;
+        private Func<string, string, bool, string> _wikiText;
 
         private void Bind()
         {
@@ -247,6 +260,19 @@ namespace Syntrix.Api
             _notify = Get<Action<ulong, string, string, string[], int, string>>("Notify.Player");
             _setPublish = Get<Action<string, string>>("Settings.Publish");
             _setSubscribe = Get<Action<string, Action<string>>>("Settings.Subscribe");
+            _useRegister = Get<Action<string, string, Action<long, int>>>("Use.Register");
+            _useUnregister = Get<Action<string>>("Use.Unregister");
+            _wikiOpen = Get<Func<string, bool>>("Wiki.Open");
+            _wikiClose = Get<Action>("Wiki.Close");
+            _wikiIsOpen = Get<Func<bool>>("Wiki.IsOpen");
+            _wikiOnClosed = Get<Action<Action>>("Wiki.OnClosed");
+            _wikiAddSource = Get<Action<Func<string, string>>>("Wiki.AddSource");
+            _wikiAddTables = Get<Action<Func<string, string, string, string, string, string>>>("Wiki.AddTables");
+            _wikiContext = Get<Func<string>>("Wiki.Context");
+            _wikiReload = Get<Action>("Wiki.Reload");
+            _wikiPlanet = Get<Func<string, bool, string[]>>("Wiki.Planet");
+            _wikiTitle = Get<Func<string, bool, string>>("Wiki.Title");
+            _wikiText = Get<Func<string, string, bool, string>>("Wiki.Text");
         }
 
         // ---------- info ----------
@@ -440,6 +466,82 @@ namespace Syntrix.Api
         /// <param name="key">Text key.</param>
         public static string TextArg(string key) { return TextArgPrefix + key; }
 
+        // ---------- F action (API 3) ----------
+
+        /// <summary>
+        /// API 3. Own F action for a block type. The block needs a UseObjectsComponent with UseObjectTypeOverride
+        /// "syntrix" in its definition (see Examples); K still opens the Vanilla terminal. Players only.
+        /// </summary>
+        /// <param name="blockKey">"TypeId/SubtypeId" without "MyObjectBuilder_", e.g. "TerminalBlock/MyPanel".</param>
+        /// <param name="hintKey">Text key (MyTexts) of the hint shown while aiming at the block; "{0}" is the key, null = "Use".</param>
+        /// <param name="handler">Runs on the player who pressed F: (block entity id, action 0).</param>
+        public void UseRegister(string blockKey, string hintKey, Action<long, int> handler) { WhenReady(() => { if (_useRegister != null) _useRegister(blockKey, hintKey, handler); }); }
+
+        /// <summary>API 3. Removes the F action of a block type (only the mod that registered it).</summary>
+        /// <param name="blockKey">"TypeId/SubtypeId" as given to <see cref="UseRegister"/>.</param>
+        public void UseUnregister(string blockKey) { if (_useUnregister != null) _useUnregister(blockKey); }
+
+        // ---------- wiki (API 3) ----------
+
+        /// <summary>API 3. Opens the wiki (players only); false if it could not open.</summary>
+        /// <param name="page">Page id to show, null = the last page.</param>
+        public bool WikiOpen(string page = null) { return _wikiOpen != null && _wikiOpen(page); }
+
+        /// <summary>API 3. Closes the wiki window.</summary>
+        public void WikiClose() { if (_wikiClose != null) _wikiClose(); }
+
+        /// <summary>API 3. True while the wiki window is open.</summary>
+        public bool WikiIsOpen { get { return _wikiIsOpen != null && _wikiIsOpen(); } }
+
+        /// <summary>API 3. Runs when the wiki window closes (one handler per mod; null removes it).</summary>
+        /// <param name="handler">Handler without arguments.</param>
+        public void WikiOnClosed(Action handler) { WhenReady(() => { if (_wikiOnClosed != null) _wikiOnClosed(handler); }); }
+
+        /// <summary>
+        /// API 3. Generated pages: Syntrix calls the function when it builds the wiki, with the context as XML
+        /// (&lt;SyxWiki&gt; with all &lt;System&gt; lists and one &lt;Page Id Parent Order Source&gt; stub per page),
+        /// and merges the returned &lt;SyxWiki&gt; text like a wiki file (null or empty = nothing).
+        /// </summary>
+        /// <param name="source">Context XML in, wiki XML out; null removes it.</param>
+        public void WikiAddSource(Func<string, string> source) { WhenReady(() => { if (_wikiAddSource != null) _wikiAddSource(source); }); }
+
+        /// <summary>
+        /// API 3. Automatic tables and lists (Auto="..." in a wiki file): (kind "Table" or "List", auto, system id,
+        /// planet id, page id) → &lt;SyxWiki&gt;&lt;Page Id="_"&gt; with one &lt;Table&gt; or &lt;List&gt;, or null if the
+        /// Auto name is not yours.
+        /// </summary>
+        /// <param name="tables">Filler; null removes it.</param>
+        public void WikiAddTables(Func<string, string, string, string, string, string> tables) { WhenReady(() => { if (_wikiAddTables != null) _wikiAddTables(tables); }); }
+
+        /// <summary>API 3. The context XML (systems and page stubs of all wiki files), null without the framework or on a server.</summary>
+        public string WikiContext() { return _wikiContext != null ? _wikiContext() : null; }
+
+        /// <summary>API 3. Builds the wiki again on its next opening (e.g. after generated pages changed).</summary>
+        public void WikiReload() { if (_wikiReload != null) _wikiReload(); }
+
+        /// <summary>
+        /// API 3. A planet of the wiki for an exact or partial planet definition subtype (e.g. "Earth" finds "Sol-Earth"):
+        /// [0] page id, [1] name, [2] image material ("" if none or not loaded), [3] image credit, [4] facts text,
+        /// [5] short line with gravity, atmosphere and temperature. Null if no planet matches (players only).
+        /// </summary>
+        /// <param name="definition">Planet definition subtype or a part of it.</param>
+        /// <param name="german">True for German texts.</param>
+        public string[] WikiPlanet(string definition, bool german) { return _wikiPlanet != null ? _wikiPlanet(definition, german) : null; }
+
+        /// <summary>API 3. Title of a wiki page in the language, null if the page does not exist (players only).</summary>
+        /// <param name="page">Page id.</param>
+        /// <param name="german">True for the German title.</param>
+        public string WikiTitle(string page, bool german) { return _wikiTitle != null ? _wikiTitle(page, german) : null; }
+
+        /// <summary>
+        /// API 3. A text key in the wanted language, independent of the game language (the wiki shows both): read from
+        /// Data/Localization/&lt;file&gt;.resx (English) or &lt;file&gt;.de.resx (German) of every loaded mod; null if no mod has it.
+        /// </summary>
+        /// <param name="file">Base name of the resx file, e.g. "MyTexts_GridCore".</param>
+        /// <param name="key">Text key.</param>
+        /// <param name="german">True for German.</param>
+        public string WikiText(string file, string key, bool german) { return _wikiText != null ? _wikiText(file, key, german) : null; }
+
         // ---------- settings ----------
 
         private readonly Dictionary<string, string> _settings = new Dictionary<string, string>();
@@ -622,6 +724,136 @@ namespace Syntrix.Api
         /// <summary>String id of a key (for terminal titles and tooltips).</summary>
         /// <param name="key">Text key.</param>
         public static MyStringId Id(string key) { return MyStringId.GetOrCompute(key); }
+    }
+
+    /// <summary>
+    /// Writes wiki XML for <see cref="SyntrixApi.WikiAddSource"/> (pages) and <see cref="SyntrixApi.WikiAddTables"/>
+    /// (one table or list): text is escaped, table cells are joined with "|" (links [[page|text]] stay whole).
+    /// Example for a table: <c>new SyntrixWikiXml().Page("_").Table("2|3").Header(de, en).Row(de, en).ToString()</c>.
+    /// </summary>
+    public class SyntrixWikiXml
+    {
+        private readonly StringBuilder _sb = new StringBuilder("<SyxWiki>");
+        private bool _page, _table, _list;
+
+        /// <summary>Starts a page (ends the open one). For WikiAddTables use the id "_".</summary>
+        /// <param name="id">Page id.</param>
+        /// <param name="parent">Parent page id, null = top.</param>
+        /// <param name="order">Order among the siblings.</param>
+        /// <param name="titleDe">German title.</param>
+        /// <param name="titleEn">English title.</param>
+        /// <param name="source">Mod name shown as the source, null = the mod that returned the XML.</param>
+        /// <param name="icons">Icons next to the title (material names or definition ids, separated by ';').</param>
+        public SyntrixWikiXml Page(string id, string parent = null, int order = 0, string titleDe = null, string titleEn = null, string source = null, string icons = null)
+        {
+            EndPage();
+            _sb.Append("<Page").Append(Attr("Id", id)).Append(Attr("Parent", parent)).Append(Attr("Order", order.ToString()))
+               .Append(Attr("Source", source)).Append(Attr("Icons", icons)).Append('>');
+            if (titleDe != null || titleEn != null)
+                _sb.Append("<Title").Append(Attr("de", titleDe)).Append(Attr("en", titleEn)).Append(" />");
+            _page = true;
+            return this;
+        }
+
+        /// <summary>Heading on the open page.</summary>
+        public SyntrixWikiXml Heading(string de, string en) { EndBlock(); _sb.Append("<Heading").Append(Attr("de", de)).Append(Attr("en", en)).Append(" />"); return this; }
+
+        /// <summary>Text on the open page (blank lines separate paragraphs, "- " starts a bullet).</summary>
+        public SyntrixWikiXml Text(string de, string en) { return Long("Text", de, en); }
+
+        /// <summary>Note box on the open page.</summary>
+        public SyntrixWikiXml Note(string de, string en) { return Long("Note", de, en); }
+
+        /// <summary>Starts a table on the open page.</summary>
+        /// <param name="widths">Relative column widths "2|1|3", null = equal.</param>
+        public SyntrixWikiXml Table(string widths = null) { EndBlock(); _sb.Append("<Table").Append(Attr("Widths", widths)).Append('>'); _table = true; return this; }
+
+        /// <summary>Header of the open table.</summary>
+        public SyntrixWikiXml Header(string[] de, string[] en) { _sb.Append("<Header").Append(Attr("de", Cells(de))).Append(Attr("en", Cells(en))).Append(" />"); return this; }
+
+        /// <summary>Row of the open table.</summary>
+        public SyntrixWikiXml Row(string[] de, string[] en) { _sb.Append("<Row").Append(Attr("de", Cells(de))).Append(Attr("en", Cells(en))).Append(" />"); return this; }
+
+        /// <summary>Starts a link list on the open page.</summary>
+        /// <param name="columns">Columns (1 to 6), 0 = default.</param>
+        public SyntrixWikiXml List(int columns = 0) { EndBlock(); _sb.Append("<List").Append(columns > 0 ? Attr("Columns", columns.ToString()) : "").Append('>'); _list = true; return this; }
+
+        /// <summary>Entry of the open list.</summary>
+        /// <param name="page">Page a click opens, null = none.</param>
+        /// <param name="de">German text.</param>
+        /// <param name="en">English text.</param>
+        /// <param name="extraDe">Second German text in quiet colour, null = none.</param>
+        /// <param name="extraEn">Second English text, null = none.</param>
+        /// <param name="icons">Icons (material names or definition ids such as "MyObjectBuilder_Ore/Iron", ';'), null = none.</param>
+        /// <param name="block">Block "Type/Subtype" whose icon is shown when icons is null.</param>
+        public SyntrixWikiXml Entry(string page, string de, string en, string extraDe = null, string extraEn = null, string icons = null, string block = null)
+        {
+            _sb.Append("<Entry").Append(Attr("Page", page)).Append(Attr("Block", block)).Append(Attr("Icons", icons))
+               .Append(Attr("de", de)).Append(Attr("en", en)).Append(Attr("ExtraDe", extraDe)).Append(Attr("ExtraEn", extraEn)).Append(" />");
+            return this;
+        }
+
+        /// <summary>Problem for the wiki error page.</summary>
+        public SyntrixWikiXml Error(string text) { EndPage(); _sb.Append("<Error>").Append(Escape(text)).Append("</Error>"); return this; }
+
+        /// <summary>The finished &lt;SyxWiki&gt; text.</summary>
+        public override string ToString()
+        {
+            EndPage();
+            return _sb.ToString() + "</SyxWiki>";
+        }
+
+        private SyntrixWikiXml Long(string element, string de, string en)
+        {
+            EndBlock();
+            _sb.Append('<').Append(element).Append('>');
+            if (!string.IsNullOrEmpty(de))
+                _sb.Append("<de>").Append(Escape(de)).Append("</de>");
+            if (!string.IsNullOrEmpty(en))
+                _sb.Append("<en>").Append(Escape(en)).Append("</en>");
+            _sb.Append("</").Append(element).Append('>');
+            return this;
+        }
+
+        private void EndBlock()
+        {
+            if (_table)
+                _sb.Append("</Table>");
+            if (_list)
+                _sb.Append("</List>");
+            _table = _list = false;
+        }
+
+        private void EndPage()
+        {
+            EndBlock();
+            if (_page)
+                _sb.Append("</Page>");
+            _page = false;
+        }
+
+        private static string Cells(string[] cells)
+        {
+            if (cells == null)
+                return null;
+            var parts = new string[cells.Length];
+            for (int i = 0; i < cells.Length; i++)
+                parts[i] = string.IsNullOrEmpty(cells[i]) ? " " : cells[i].Replace("\r", "").Replace("\n", " ");
+            return string.Join("|", parts);
+        }
+
+        private static string Attr(string name, string value)
+        {
+            return value == null ? "" : " " + name + "=\"" + Escape(value) + "\"";
+        }
+
+        /// <summary>Text for XML (&amp;, &lt;, &gt;, quotes).</summary>
+        public static string Escape(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return "";
+            return text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
+        }
     }
 
     /// <summary>Log lines with the mod name in front; optionally also into an own file in local storage.</summary>
