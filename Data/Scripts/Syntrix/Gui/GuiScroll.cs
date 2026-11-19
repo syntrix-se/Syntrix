@@ -11,7 +11,9 @@ namespace Syntrix.Gui
     /// </summary>
     public class GuiScroll : GuiStack
     {
+        /// <summary>Scroll position in screen pixels.</summary>
         public float Position;
+        /// <summary>Stay at the end when content is added while the end is shown.</summary>
         public bool ToEnd;
         private float _content;
         private float _view;
@@ -19,6 +21,7 @@ namespace Syntrix.Gui
         private float _dragStart, _dragPosition;
         private bool _barHover;
 
+        /// <summary>Creates a clipping scroll area with the list panel style.</summary>
         public GuiScroll() : base(GuiKind.Scroll)
         {
             Clip = true;
@@ -28,6 +31,7 @@ namespace Syntrix.Gui
 
         private float BarWidth => 12f * K;
 
+        /// <summary>Largest scroll position in screen pixels.</summary>
         public float ScrollMax => Math.Max(0f, _content - _view);
 
         public override Vector2 Measure(float width, float height)

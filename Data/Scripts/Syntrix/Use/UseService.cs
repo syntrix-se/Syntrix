@@ -19,22 +19,28 @@ namespace Syntrix.Use
     /// </summary>
     public sealed class UseService
     {
+        /// <summary>The running service; null before start and after Stop.</summary>
         public static UseService Instance { get; private set; }
 
         private struct Entry
         {
+            /// <summary>Mod that registered the action.</summary>
             public string Mod;
+            /// <summary>Hint text (language key or text) shown for the F key; null = "Use".</summary>
             public string Hint;
+            /// <summary>Action run on F: (block entity id, action number).</summary>
             public Action<long, int> Handler;
         }
 
         private readonly Dictionary<string, Entry> _entries = new Dictionary<string, Entry>();
 
+        /// <summary>Creates the service and makes it the instance.</summary>
         public UseService()
         {
             Instance = this;
         }
 
+        /// <summary>Clears all registrations.</summary>
         public void Stop()
         {
             _entries.Clear();
@@ -53,6 +59,7 @@ namespace Syntrix.Use
             _entries[blockKey] = new Entry { Mod = mod, Hint = hint, Handler = handler };
         }
 
+        /// <summary>Removes the registration of a block type if it belongs to the mod.</summary>
         public void Unregister(string mod, string blockKey)
         {
             Entry old;
@@ -60,6 +67,7 @@ namespace Syntrix.Use
                 _entries.Remove(blockKey);
         }
 
+        /// <summary>Key "TypeId/SubtypeId" of a cube block (TypeId without MyObjectBuilder_); null if the entity is no block.</summary>
         public static string KeyOf(IMyEntity block)
         {
             var b = block as IMyCubeBlock;
@@ -69,12 +77,14 @@ namespace Syntrix.Use
             return id.TypeId.ToString().Replace("MyObjectBuilder_", "") + "/" + id.SubtypeName;
         }
 
+        /// <summary>True if an F action is registered for the block's type.</summary>
         public bool Has(IMyEntity block)
         {
             var key = KeyOf(block);
             return key != null && _entries.ContainsKey(key);
         }
 
+        /// <summary>Hint text registered for the block's type; null if none.</summary>
         public string Hint(IMyEntity block)
         {
             Entry e;
@@ -97,71 +107,6 @@ namespace Syntrix.Use
             {
                 Log.Error("F action of " + key + " (" + e.Mod + ")", x);
             }
-        }
-    }
-
-    /// <summary>
-    /// The game makes one per use point of a block whose UseObjectsComponent has UseObjectTypeOverride "syntrix".
-    /// F (Manipulate) runs the registered action, K (OpenTerminal) the Vanilla terminal.
-    /// </summary>
-    [MyUseObject("syntrix")]
-    public class SyntrixUseObject : MyUseObjectBase
-    {
-        private static readonly MyStringId DefaultHint = MyStringId.GetOrCompute("{0} Use");
-        private static readonly MyStringId TerminalHint = MyStringId.GetOrCompute("NotificationHintPressToOpenControlPanel");
-
-        public SyntrixUseObject(IMyEntity owner, string dummyName, IMyModelDummy dummyData, uint shapeKey)
-            : base(owner, dummyData)
-        {
-        }
-
-        public override UseActionEnum PrimaryAction { get { return UseActionEnum.Manipulate; } }
-        public override UseActionEnum SecondaryAction { get { return UseActionEnum.OpenTerminal; } }
-
-        public override void Use(UseActionEnum action, IMyEntity user)
-        {
-            var character = user as IMyCharacter;
-            if (MyAPIGateway.Utilities.IsDedicated || MyAPIGateway.Session == null || MyAPIGateway.Session.Player == null
-                || MyAPIGateway.Session.Player.Character != character || character == null)
-                return;
-            var block = Owner;
-            if (action == UseActionEnum.Manipulate)
-            {
-                var service = UseService.Instance;
-                if (service != null && service.Has(block))
-                    service.Use(block, 0);
-                else
-                    MyAPIGateway.Gui.ShowTerminalPage(MyTerminalPageEnum.ControlPanel, character, block);
-            }
-            else if (action == UseActionEnum.OpenTerminal)
-                MyAPIGateway.Gui.ShowTerminalPage(MyTerminalPageEnum.ControlPanel, character, block);
-        }
-
-        public override MyActionDescription GetActionInfo(UseActionEnum action)
-        {
-            var d = new MyActionDescription();
-            bool f = action == UseActionEnum.Manipulate;
-            string hint = null;
-            if (f && UseService.Instance != null)
-                hint = UseService.Instance.Hint(Owner);
-            if (f)
-            {
-                d.Text = string.IsNullOrEmpty(hint) ? DefaultHint : MyStringId.GetOrCompute(MyTexts.GetString(hint).Contains("{0}") ? MyTexts.GetString(hint) : "{0} " + MyTexts.GetString(hint));
-                d.FormatParams = new object[] { "[" + Key("USE") + "]" };
-            }
-            else
-            {
-                d.Text = TerminalHint;
-                d.FormatParams = new object[] { "[" + Key("TERMINAL") + "]" };
-            }
-            d.IsTextControlHint = true;
-            return d;
-        }
-
-        private static string Key(string control)
-        {
-            var c = MyAPIGateway.Input.GetGameControl(MyStringId.GetOrCompute(control));
-            return c != null ? c.GetControlButtonName(MyGuiInputDeviceEnum.Keyboard) : control;
         }
     }
 }

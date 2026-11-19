@@ -7,6 +7,7 @@ namespace Syntrix.Wiki
     /// <summary>Element &lt;Planet&gt; inside &lt;System&gt;.</summary>
     public class PlanetXml : LangTextXml
     {
+        /// <summary>Unique id of the planet or moon.</summary>
         [XmlAttribute("Id")]
         public string Id;
 

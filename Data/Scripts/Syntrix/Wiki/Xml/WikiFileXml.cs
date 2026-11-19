@@ -84,12 +84,15 @@ namespace Syntrix.Wiki
     [XmlRoot("SyxWiki")]
     public class WikiFileXml
     {
+        /// <summary>More wiki files of the mod (path relative to the mod folder).</summary>
         [XmlElement("File")]
         public List<string> Files = new List<string>();
 
+        /// <summary>Pages and additions to pages.</summary>
         [XmlElement("Page")]
         public List<WikiPageXml> Pages = new List<WikiPageXml>();
 
+        /// <summary>Planetary systems with their bodies.</summary>
         [XmlElement("System")]
         public List<SystemXml> Systems = new List<SystemXml>();
 

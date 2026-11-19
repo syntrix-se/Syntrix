@@ -16,15 +16,19 @@ namespace Syntrix.Wiki
         [XmlAttribute("Auto")]
         public string Auto;
 
+        /// <summary>System id filter of an automatic table.</summary>
         [XmlAttribute("System")]
         public string SystemId;
 
+        /// <summary>Planet id filter of an automatic table.</summary>
         [XmlAttribute("Planet")]
         public string PlanetId;
 
+        /// <summary>Header row of a table made by hand.</summary>
         [XmlElement("Header")]
         public LangTextXml Header;
 
+        /// <summary>Rows of a table made by hand; cells separated by '|'.</summary>
         [XmlElement("Row")]
         public List<LangTextXml> Rows = new List<LangTextXml>();
     }

@@ -14,12 +14,19 @@ namespace Syntrix.Gui
     /// </summary>
     public class GuiWindow : GuiElement
     {
+        /// <summary>Title centred at the top; null = no title line.</summary>
         public string Title;
+        /// <summary>Pauses the game in single player while open.</summary>
         public bool Pause;
+        /// <summary>Esc closes the window; otherwise it raises GuiEvent.Cancel.</summary>
         public bool EscapeCloses = true;
+        /// <summary>Shows the close button.</summary>
         public bool CloseButton = true;
+        /// <summary>Darkens the game behind the window.</summary>
         public bool BackgroundFade = true;
+        /// <summary>Window size in normalized GUI coordinates.</summary>
         public Vector2 WindowSize = GuiStyle.WindowSize;
+        /// <summary>Window centre in normalized GUI coordinates (0.5, 0.5 = middle of the screen).</summary>
         public Vector2 Position = new Vector2(0.5f, 0.5f);
 
         /// <summary>Element with keyboard focus (text field), null if none.</summary>
@@ -48,6 +55,7 @@ namespace Syntrix.Gui
 
         private static int _counter;
 
+        /// <summary>Creates a window with a margin of 40 x 30 reference pixels.</summary>
         public GuiWindow() : base(GuiKind.Window)
         {
             Padding = new Vector2(40f, 30f);
@@ -84,12 +92,14 @@ namespace Syntrix.Gui
             return true;
         }
 
+        /// <summary>Closes the window with the game's closing handling.</summary>
         public void Close()
         {
             if (_screen != null && _screen.IsOpen)
                 _screen.Close();
         }
 
+        /// <summary>Closes the window immediately.</summary>
         public void CloseNow()
         {
             if (_screen != null && _screen.IsOpen)
@@ -497,6 +507,7 @@ namespace Syntrix.Gui
         {
             private readonly GuiWindow _w;
 
+            /// <summary>Creates the game screen for a window with its position and size.</summary>
             public Screen(GuiWindow w, string name) : base(name, w.Position, w.WindowSize, Vector4.One)
             {
                 _w = w;

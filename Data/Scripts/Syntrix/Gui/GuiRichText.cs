@@ -18,33 +18,49 @@ namespace Syntrix.Gui
     {
         private struct Style
         {
+            /// <summary>Font name.</summary>
             public string Font;
+            /// <summary>Text scale.</summary>
             public float Scale;
+            /// <summary>Text colour.</summary>
             public Color Color;
+            /// <summary>Draw underlined.</summary>
             public bool Underline;
+            /// <summary>Draw in the bright font.</summary>
             public bool Bright;
+            /// <summary>Link target; null = no link.</summary>
             public string Link;
         }
 
         private class Span
         {
+            /// <summary>Text of the span.</summary>
             public string Text;
+            /// <summary>Style of the span.</summary>
             public Style Style;
+            /// <summary>Position in the line and width, screen pixels.</summary>
             public float X, Width;
         }
 
         private class Line
         {
+            /// <summary>Spans of the line from left to right.</summary>
             public readonly List<Span> Spans = new List<Span>();
+            /// <summary>Top, height and width of the line, screen pixels.</summary>
             public float Y, Height, Width;
+            /// <summary>Alignment: 0 left, 1 centre, 2 right.</summary>
             public int Align;
         }
 
         private class Run
         {
+            /// <summary>Text of the run.</summary>
             public string Text;
+            /// <summary>Style of the run.</summary>
             public Style Style;
+            /// <summary>Alignment of the paragraph: 0 left, 1 centre, 2 right.</summary>
             public int Align;
+            /// <summary>The run is a line break.</summary>
             public bool Break;
         }
 

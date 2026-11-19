@@ -18,6 +18,7 @@ namespace Syntrix.Wiki
     /// </summary>
     public sealed class WikiService
     {
+        /// <summary>The running service; null before start and after Stop.</summary>
         public static WikiService Instance { get; private set; }
 
         private const string ExpandedFile = "SyxWiki-Expanded.txt";
@@ -35,19 +36,23 @@ namespace Syntrix.Wiki
         private WikiWindow _window;
         private DateTime _lastToggle;
 
+        /// <summary>Creates the service and makes it the instance.</summary>
         public WikiService(SyntrixCore core)
         {
             _core = core;
             Instance = this;
         }
 
+        /// <summary>The wiki can be shown (local player, not a dedicated server).</summary>
         public bool Usable => _core.IsPlayer;
 
         /// <summary>Data last built (null before the first opening).</summary>
         public WikiData Data => _data;
 
+        /// <summary>True if the game language is German.</summary>
         public static bool German => MyAPIGateway.Session?.Config?.Language == MyLanguagesEnum.German;
 
+        /// <summary>Registers the /syxwiki command and the key handler.</summary>
         public void Start()
         {
             if (!Usable)
@@ -56,6 +61,7 @@ namespace Syntrix.Wiki
             _core.Gui.OnKeys(Keys);
         }
 
+        /// <summary>Closes the window and clears all registrations.</summary>
         public void Stop()
         {
             if (_window != null)
@@ -110,6 +116,7 @@ namespace Syntrix.Wiki
             return _context;
         }
 
+        /// <summary>The wiki window is open.</summary>
         public bool IsOpen => _window != null && _window.IsOpen;
 
         /// <summary>Opens the wiki (page id or empty for the last page); false if the window could not open.</summary>
@@ -139,6 +146,7 @@ namespace Syntrix.Wiki
             }
         }
 
+        /// <summary>Closes the wiki window.</summary>
         public void Close()
         {
             if (_window != null)

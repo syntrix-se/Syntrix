@@ -8,12 +8,15 @@ namespace Syntrix.Wiki
     /// <summary>Element &lt;Page&gt;: one page or an addition to a page (Extend="true").</summary>
     public class WikiPageXml
     {
+        /// <summary>Unique page id that links and sub pages point to.</summary>
         [XmlAttribute("Id")]
         public string Id;
 
+        /// <summary>Id of the parent page; empty = top level.</summary>
         [XmlAttribute("Parent")]
         public string Parent;
 
+        /// <summary>Position among the sibling pages, ascending.</summary>
         [XmlAttribute("Order")]
         public int Order;
 
@@ -21,9 +24,11 @@ namespace Syntrix.Wiki
         [XmlAttribute("Extend")]
         public bool Extend;
 
+        /// <summary>Highlight: "important" or "new"; otherwise normal.</summary>
         [XmlAttribute("Level")]
         public string Level;
 
+        /// <summary>Name of the symbol (Textures/GUI/Wiki/NAME.dds).</summary>
         [XmlAttribute("Symbol")]
         public string Symbol;
 
@@ -43,6 +48,7 @@ namespace Syntrix.Wiki
         [XmlAttribute("Source")]
         public string Source;
 
+        /// <summary>Title of the page.</summary>
         [XmlElement("Title")]
         public LangTextXml Title;
 

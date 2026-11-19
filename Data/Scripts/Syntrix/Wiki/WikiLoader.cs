@@ -13,6 +13,7 @@ namespace Syntrix.Wiki
     /// </summary>
     public static class WikiLoader
     {
+        /// <summary>Wiki file of every mod, relative to the mod folder.</summary>
         public const string MainFile = "Data/Syntrix-Wiki.xml";
         private const int MaxFilesPerMod = 100;
 

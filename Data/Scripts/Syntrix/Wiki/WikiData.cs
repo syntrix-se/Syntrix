@@ -13,7 +13,9 @@ namespace Syntrix.Wiki
     /// </summary>
     public class WikiData
     {
+        /// <summary>Id of the start page.</summary>
         public const string StartId = "start";
+        /// <summary>Id of the page that lists the errors.</summary>
         public const string ErrorId = "wiki-error";
 
         /// <summary>Known symbols; other names are reported and left out.</summary>
@@ -23,7 +25,9 @@ namespace Syntrix.Wiki
             "book", "info", "warning", "component", "research", "star",
         };
 
+        /// <summary>Pages by id.</summary>
         public readonly Dictionary<string, WikiPage> Pages = new Dictionary<string, WikiPage>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>Errors found while reading, shown on the error page.</summary>
         public readonly List<string> Errors = new List<string>();
 
         /// <summary>Log only, no error page (e.g. an addition for a page of a mod that is not loaded).</summary>
@@ -32,8 +36,11 @@ namespace Syntrix.Wiki
         /// <summary>Check outside the game with all mods: notices count as errors as well.</summary>
         public bool Strict;
 
+        /// <summary>Wiki files that were read.</summary>
         public readonly List<string> Sources = new List<string>();
+        /// <summary>Planetary systems in file order.</summary>
         public readonly List<WikiSystem> Systems = new List<WikiSystem>();
+        /// <summary>Planets and moons of all systems by id.</summary>
         public readonly Dictionary<string, WikiPlanet> Planets = new Dictionary<string, WikiPlanet>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>System lists as read, with their mod in Source (context for generating mods).</summary>
@@ -44,12 +51,17 @@ namespace Syntrix.Wiki
         /// <summary>A link [[target]] or [[target|text]] inside a text.</summary>
         public struct Link
         {
+            /// <summary>Index of the first character of the link in the text.</summary>
             public int Start;
+            /// <summary>Length of the link including the brackets.</summary>
             public int Length;
+            /// <summary>Id of the page the link points to.</summary>
             public string Target;
+            /// <summary>Text shown for the link.</summary>
             public string Display;
         }
 
+        /// <summary>Text in the language, the other one if empty, otherwise "".</summary>
         public static string Pick(bool german, string de, string en)
         {
             if (german)

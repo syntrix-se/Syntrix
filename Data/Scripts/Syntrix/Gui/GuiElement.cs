@@ -32,23 +32,41 @@ namespace Syntrix.Gui
 
         // ---------- properties ----------
 
+        /// <summary>Drawn and hit-tested; false collapses it out of the layout.</summary>
         public bool Visible = true;
+        /// <summary>Takes input; disabled elements are drawn dimmed.</summary>
         public bool Enabled = true;
+        /// <summary>Fills the width of the parent.</summary>
         public bool FillWidth;
+        /// <summary>Fills the height of the parent.</summary>
         public bool FillHeight;
+        /// <summary>Clips children to the content area.</summary>
         public bool Clip;
+        /// <summary>Offset from the anchor position, reference pixels.</summary>
         public Vector2 Offset;
+        /// <summary>Size in reference pixels; 0 = automatic.</summary>
         public Vector2 Size;
+        /// <summary>Inner margin (left/right, top/bottom), reference pixels.</summary>
         public Vector2 Padding;
+        /// <summary>Anchor inside the parent, 0..8 (top left .. bottom right).</summary>
         public int Anchor;
+        /// <summary>Background colour.</summary>
         public Color Color = Color.Transparent;
+        /// <summary>Border colour.</summary>
         public Color BorderColor = Color.Transparent;
+        /// <summary>Border width in reference pixels.</summary>
         public float BorderWidth = 1f;
+        /// <summary>Tooltip text (markup); null = none.</summary>
         public string Tooltip;
+        /// <summary>Font name; null = inherited from the parent.</summary>
         public string Font;
+        /// <summary>Text colour.</summary>
         public Color TextColor = GuiStyle.Text;
+        /// <summary>Text scale; 0.8 = Vanilla.</summary>
         public float TextScale = GuiStyle.TextScale;
+        /// <summary>Text alignment, 0 left, 1 centre, 2 right.</summary>
         public int Align;
+        /// <summary>Style number (GuiStyleId).</summary>
         public int Style;
 
         // ---------- state after layout ----------
@@ -65,6 +83,7 @@ namespace Syntrix.Gui
         /// <summary>Mouse button is held on the element.</summary>
         public bool Pressed;
 
+        /// <summary>Creates an element of the given kind (GuiKind).</summary>
         public GuiElement(int kind)
         {
             Kind = kind;
@@ -117,6 +136,7 @@ namespace Syntrix.Gui
 
         // ---------- tree ----------
 
+        /// <summary>Appends a child; it is detached from its former parent first.</summary>
         public void Add(GuiElement child)
         {
             if (child == null || child == this)
@@ -128,6 +148,7 @@ namespace Syntrix.Gui
             Invalidate();
         }
 
+        /// <summary>Removes a child.</summary>
         public void Remove(GuiElement child)
         {
             if (child != null && Children.Remove(child))
@@ -236,6 +257,7 @@ namespace Syntrix.Gui
             DrawOver();
         }
 
+        /// <summary>Draws the children in order.</summary>
         protected virtual void DrawChildren()
         {
             foreach (var c in Children)
@@ -359,6 +381,7 @@ namespace Syntrix.Gui
 
         // ---------- properties by number ----------
 
+        /// <summary>Sets a bool property by number; false if this element does not know it.</summary>
         public virtual bool SetBool(int prop, bool v)
         {
             switch (prop)
@@ -374,6 +397,7 @@ namespace Syntrix.Gui
             return true;
         }
 
+        /// <summary>Reads a bool property by number; false if this element does not know it.</summary>
         public virtual bool GetBool(int prop, out bool v)
         {
             switch (prop)
@@ -388,6 +412,7 @@ namespace Syntrix.Gui
             }
         }
 
+        /// <summary>Sets an int property by number; false if this element does not know it.</summary>
         public virtual bool SetInt(int prop, int v)
         {
             switch (prop)
@@ -401,6 +426,7 @@ namespace Syntrix.Gui
             return true;
         }
 
+        /// <summary>Reads an int property by number; false if this element does not know it.</summary>
         public virtual bool GetInt(int prop, out int v)
         {
             switch (prop)
@@ -412,6 +438,7 @@ namespace Syntrix.Gui
             }
         }
 
+        /// <summary>Sets a float property by number; false if this element does not know it.</summary>
         public virtual bool SetFloat(int prop, float v)
         {
             switch (prop)
@@ -424,6 +451,7 @@ namespace Syntrix.Gui
             return true;
         }
 
+        /// <summary>Reads a float property by number; false if this element does not know it.</summary>
         public virtual bool GetFloat(int prop, out float v)
         {
             switch (prop)
@@ -434,6 +462,7 @@ namespace Syntrix.Gui
             }
         }
 
+        /// <summary>Sets a vector property by number; false if this element does not know it.</summary>
         public virtual bool SetVector(int prop, Vector2 v)
         {
             switch (prop)
@@ -447,6 +476,7 @@ namespace Syntrix.Gui
             return true;
         }
 
+        /// <summary>Reads a vector property by number (including screen position and size in reference pixels); false if unknown.</summary>
         public virtual bool GetVector(int prop, out Vector2 v)
         {
             switch (prop)
@@ -460,6 +490,7 @@ namespace Syntrix.Gui
             }
         }
 
+        /// <summary>Sets a colour property by number; false if this element does not know it.</summary>
         public virtual bool SetColor(int prop, Color v)
         {
             switch (prop)
@@ -471,6 +502,7 @@ namespace Syntrix.Gui
             }
         }
 
+        /// <summary>Reads a colour property by number; false if this element does not know it.</summary>
         public virtual bool GetColor(int prop, out Color v)
         {
             switch (prop)
@@ -482,6 +514,7 @@ namespace Syntrix.Gui
             }
         }
 
+        /// <summary>Sets a text property by number; false if this element does not know it.</summary>
         public virtual bool SetText(int prop, string v)
         {
             switch (prop)
@@ -492,6 +525,7 @@ namespace Syntrix.Gui
             }
         }
 
+        /// <summary>Reads a text property by number; false if this element does not know it.</summary>
         public virtual bool GetText(int prop, out string v)
         {
             switch (prop)
@@ -504,11 +538,17 @@ namespace Syntrix.Gui
 
         // ---------- items (lists, trees, tabs …) ----------
 
+        /// <summary>Adds an item (lists, trees, tabs, drop-downs); returns its index, -1 if the element has no items.</summary>
         public virtual int ItemAdd(string key, string parentKey, string text, string icons) { return -1; }
+        /// <summary>Sets a property of one item.</summary>
         public virtual void ItemSet(int index, int prop, string value) { }
+        /// <summary>Removes one item.</summary>
         public virtual void ItemRemove(int index) { }
+        /// <summary>Removes all items.</summary>
         public virtual void ItemClear() { }
+        /// <summary>Number of items.</summary>
         public virtual int ItemCount => 0;
+        /// <summary>Index of the item with the key, -1 if none.</summary>
         public virtual int ItemFind(string key) { return -1; }
 
         /// <summary>Removed from its client: release resources.</summary>

@@ -36,6 +36,7 @@ namespace Syntrix.Wiki
         private bool _german;
         private bool _filling;
 
+        /// <summary>Builds the window (search, page tree, navigation, page area) in the language.</summary>
         public WikiWindow(WikiService service, bool german)
         {
             _service = service;
@@ -80,14 +81,19 @@ namespace Syntrix.Wiki
             LanguageTexts();
         }
 
+        /// <summary>The window is open.</summary>
         public bool IsOpen => _window.IsOpen;
 
+        /// <summary>Opens the window; false if the game refused.</summary>
         public bool Open() => _window.Open();
 
+        /// <summary>Closes the window.</summary>
         public void Close() => _window.Close();
 
+        /// <summary>Closes the window immediately.</summary>
         public void CloseNow() => _window.CloseNow();
 
+        /// <summary>Sets the ids of the expanded tree pages (restored from the saved file).</summary>
         public void SetExpanded(IEnumerable<string> ids)
         {
             _expanded.Clear();
@@ -96,6 +102,7 @@ namespace Syntrix.Wiki
                     _expanded.Add(id.Trim());
         }
 
+        /// <summary>Sets the keys of the pages marked as new that the player has already seen.</summary>
         public void SetSeen(IEnumerable<string> ids)
         {
             _seen.Clear();

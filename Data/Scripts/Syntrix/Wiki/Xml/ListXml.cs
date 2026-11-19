@@ -12,6 +12,7 @@ namespace Syntrix.Wiki
         [XmlAttribute("Auto")]
         public string Auto;
 
+        /// <summary>Planet id filter of an automatic list.</summary>
         [XmlAttribute("Planet")]
         public string PlanetId;
 
@@ -19,6 +20,7 @@ namespace Syntrix.Wiki
         [XmlAttribute("Columns")]
         public int Columns;
 
+        /// <summary>Entries of a list made by hand.</summary>
         [XmlElement("Entry")]
         public List<LinkXml> Entries = new List<LinkXml>();
     }

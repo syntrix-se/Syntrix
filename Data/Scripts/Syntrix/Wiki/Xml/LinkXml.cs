@@ -7,6 +7,7 @@ namespace Syntrix.Wiki
     /// <summary>Element &lt;Link&gt; of a page, also &lt;Entry&gt; of a list.</summary>
     public class LinkXml : LangTextXml
     {
+        /// <summary>Id of the page the link points to.</summary>
         [XmlAttribute("Page")]
         public string Page;
 

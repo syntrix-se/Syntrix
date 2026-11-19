@@ -5,7 +5,7 @@ terminal and chat code into every mod, mods **dock** to Syntrix at runtime and u
 
 Space Engineers mods cannot call each other's compiled code. Syntrix therefore hands each mod
 a dictionary of functions through `SendModMessage`, the same idea Rich HUD Master and
-WeaponCore use.
+WeaponCore use. Syntrix needs no other mod.
 
 ## Files a mod copies
 
@@ -14,7 +14,7 @@ Copy the dock files into your mod's script folder and do not edit them:
 | File | When |
 |---|---|
 | [`Api/SyntrixApi.cs`](Api/SyntrixApi.cs) | always |
-| [`Api/SyntrixUi.cs`](Api/SyntrixUi.cs), [`Api/SyntrixUi.Controls.cs`](Api/SyntrixUi.Controls.cs), [`Api/SyntrixUi.Terminal.cs`](Api/SyntrixUi.Terminal.cs) | windows, HUD elements or Rich HUD terminal pages; always the three together |
+| [`Api/SyntrixGui.cs`](Api/SyntrixGui.cs) | windows and screen overlays |
 
 ## Services
 
@@ -29,12 +29,13 @@ Copy the dock files into your mod's script folder and do not edit them:
 | Notifications | server sends a text key, every player sees it in their own language |
 | Registration queue | network channels, block change handlers, chat commands, event subscriptions and settings may be registered right after `Load`; the dock file keeps them and hands them over when Syntrix is ready |
 | Helpers in the dock file | `SyntrixFiles` (world and local storage, never throws), `SyntrixText` (text lookup with fallback), `SyntrixLog` (log with mod prefix, optional own log file) |
-| UI (`SyntrixUi*.cs`) | everything the Rich HUD client offers, through handles: windows, panels, labels with markup and links, buttons, text fields and multi-line text boxes, drop-downs, list boxes, tree lists and tree boxes, colour pickers (RGB, HSV), on/off buttons, named check boxes, sliders and switches, scroll bars, slider bars, icon and label buttons, radial selection, HUD spaces (camera, world matrix, scaled), custom drawing (lines, polygons, rings, meshes), tooltips with own colour, clipboard, screen values, key binds with a rebind page, and Rich HUD terminal pages (categories, control pages with controls, text pages) |
+| Windows (`SyntrixGui.cs`, players only) | windows in the Vanilla style through the game's own screen API (Esc, pause in single player, cursor, close button): panels and borders, stacks, scroll areas, text with wrapping, markup and links, buttons, images and icons (materials or definition ids), text fields, lists with icons and columns, trees, tables, check boxes, sliders, progress bars, tabs, drop-downs, tooltips, a confirmation window, a drawing area for special cases, and overlays on the screen without a window |
+| F action | a block gets its own F action (`UseRegister`) through a UseObjectsComponent with `UseObjectTypeOverride` `syntrix`; K still opens the Vanilla terminal |
+| Wiki | in-game wiki (F11, `/syxwiki`): every loaded mod adds pages with a `Data/Syntrix-Wiki.xml`, no code needed; mods with code add generated pages (`WikiAddSource`) and fill automatic tables (`WikiAddTables`) |
 
 ## Quick start
 
 1. Subscribe to Syntrix in the Workshop and add it as a **dependency** of your mod.
-   Syntrix itself depends on **Rich HUD Master** (Workshop 1965654081), which the UI service needs.
 2. Copy `Api/SyntrixApi.cs` into your mod's script folder.
 3. Dock in your session component:
 
@@ -67,52 +68,54 @@ protected override void UnloadData()
 A complete example is in [`Examples/ExampleMod`](Examples/ExampleMod). The manual is in the
 [wiki](../../wiki).
 
-## UI service
+## Window service
 
-Space Engineers mods cannot use Rich HUD classes of another mod, so Syntrix carries the Rich HUD
-client and creates the real elements. Your mod works with handles through typed wrappers in the
-three `SyntrixUi*.cs` dock files:
+Mods cannot create screen classes of another mod, so Syntrix builds the windows itself with the
+game's `MyModScreen` and draws them in the Vanilla style. Your mod works with handles through the
+typed wrappers in `Api/SyntrixGui.cs`:
 
 ```csharp
-_ui = new SyntrixUi(_syx);                 // in LoadData, after _syx.Load
-_ui.Load(BuildWindow);                     // runs when Rich HUD is ready (again after a restart)
-_ui.Bind("Toggle", "F7", () => _window.Toggle());
-_ui.BindPage("My Mod");                    // rebind page in the Rich HUD terminal (F2)
+_gui = new SyntrixGui(_syx);               // in LoadData, after _syx.Load
 
-void BuildWindow()
+void OpenWindow()
 {
-    _window = _ui.Window("[b]My window[/b]");
-    _window.Size = new Vector2(560f, 420f);
-    var text = _ui.Label(_window, "Hello [color=#2FD1C5]world[/color], see [link=help]help[/link].");
-    text.ParentAlign = UiAlign.InnerTopLeft;
-    text.Offset = new Vector2(16f, -12f);
-    text.WrapToParent(32f);
-    text.OnLink(target => MyAPIGateway.Utilities.ShowMessage("MyMod", target));
-    var pick = _ui.Dropdown(_window);
-    pick.Add("a", "First");
-    pick.Add("b", "[i]Second[/i]");
-    pick.OnSelected(key => MyAPIGateway.Utilities.ShowMessage("MyMod", key));
-    var ok = _ui.Button(_window, "OK");
-    ok.ParentAlign = UiAlign.InnerBottomRight;
-    ok.Offset = new Vector2(-16f, 16f);
-    ok.OnClick(() => _window.Close());
-
-    var page = _ui.TerminalCategory("My Mod").ControlPage("Options");
-    var tile = page.Category("General").Tile();
-    tile.CheckBox("Show window").OnChanged(on => _window.Visible = on);
+    if (!_gui.IsAvailable)                 // players only, Syntrix 1.2 or newer
+        return;
+    var window = _gui.Window("My window");   // Vanilla terminal size by default
+    var root = window.AddStack(false, 10f);
+    root.FillWidth = root.FillHeight = true;
+    var text = root.AddLabel("Hello [color=#5AC8DC]world[/color], see [link=help]help[/link].");
+    text.Link += target => MyAPIGateway.Utilities.ShowMessage("MyMod", target);
+    var list = root.AddList();
+    list.ItemAdd("plate", "Steel plate", "MyObjectBuilder_Component/SteelPlate");
+    list.Selected += (index, key) => MyAPIGateway.Utilities.ShowMessage("MyMod", key);
+    root.AddButton("Close", () => window.Close());
+    window.Open();
 }
-// UnloadData: _ui.Unload(); before _syx.Unload();
+// UnloadData: _gui.Release(); before _syx.Unload();
 ```
 
-Events arrive outside of Rich HUD's own update, so handlers may rebuild the UI. Markup: `[b]`,
+Events are queued and run after the input pass, so handlers may rebuild the window. Markup: `[b]`,
 `[i]`, `[u]`, `[color=#RRGGBB]`, `[size=1.2]`, `[font=Name]`, `[align=center]`, `[link=target]`,
 each closed with `[/tag]`; `[[` is a literal `[`. Every property without a typed wrapper is
-reachable with `Set`/`Get` and the `UiProp` numbers. The full description is in the wiki.
+reachable with `Set…`/`Get…` and the `GuiProp` numbers. The game allows four mod windows at the
+same time.
 
-Limits that come from Rich HUD itself: all pages of all mods appear under the one terminal entry
-"Syntrix" (group them with `TerminalCategory`); terminal members cannot be removed, only disabled;
-tree box entries must be text elements; the radial selection raises no events (read
-`HighlightIndex`).
+### F action
+
+```csharp
+_syx.UseRegister("FunctionalBlock/MyTerminal", "MyMod_UseHint", (entityId, action) => OpenWindow());
+```
+
+The block definition needs a UseObjectsComponent with `UseObjectTypeOverride` `syntrix`; see
+`Examples/ExampleMod/Data/EntityComponents_SyntrixExample.sbc`.
+
+### Rich HUD
+
+Syntrix 1.2 no longer ships the Rich HUD client. The `Ui.*` endpoints of API 2 stay registered and
+report "not available" (`Ui.State` = -1). A mod that still wants Rich HUD includes it itself; the
+module [Syntrix.RichHud](https://github.com/syntrix-se/Syntrix.RichHud) holds the former code as
+source with instructions.
 
 ## Compatibility promise
 
@@ -129,18 +132,14 @@ parameters, `_camelCase` for private fields, `I` for interfaces), one main type 
 after it, formatting per [`.editorconfig`](.editorconfig), English comments and XML documentation
 on everything public. Deliberate exceptions:
 
-- The dock files (`Api/SyntrixApi.cs`, `Api/SyntrixUi*.cs`) hold several types each, because a mod
+- The dock files (`Api/SyntrixApi.cs`, `Api/SyntrixGui.cs`) hold several types each, because a mod
   copies them as a whole.
 - Public fields stay where changing them would break mods or serialisation: `SyntrixLog.Debug`
-  (API 1), `UiElement.Ui` and `UiElement.Handle` (read-only), the ProtoBuf fields of `Packet`, and
-  plain data holders inside the framework (`UiMarkup.Style`, chat command entries, UI event queue,
-  typed views of `UiNode`).
+  (API 1), the ProtoBuf fields of `Packet`, the XML classes of the wiki, and plain data holders
+  inside the framework (chat command entries, element properties of the window service, wiki pages).
 - `MyTuple` instead of C# tuples (the game's script whitelist).
-- `Data/Scripts/Syntrix/RichHudFramework/` is the unchanged Rich HUD client and keeps its own style.
 
 ## License and credits
 
 MIT, see [LICENSE](LICENSE). Please name Syntrix in your Workshop description when you use it.
-Syntrix ships the Rich HUD Framework client by Zach Hembree (MIT, licence text in
-`Data/Scripts/Syntrix/RichHudFramework/LICENSE.txt`).
 Credits for ideas and patterns: [CREDITS.md](CREDITS.md). Changes per version: [CHANGELOG.md](CHANGELOG.md).

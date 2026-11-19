@@ -288,12 +288,14 @@ namespace Syntrix.Gui
             private readonly RectangleF _previous;
             private IDisposable _scope;
 
+            /// <summary>Remembers the previous clip and the game's scissor scope.</summary>
             public ClipScope(RectangleF previous, IDisposable scope)
             {
                 _previous = previous;
                 _scope = scope;
             }
 
+            /// <summary>Ends the scissor scope and restores the previous clip.</summary>
             public void Dispose()
             {
                 if (_scope != null)

@@ -15,10 +15,15 @@ namespace Syntrix.Gui
     /// </summary>
     public class GuiTextField : GuiElement
     {
+        /// <summary>Text; may contain line breaks with Multiline.</summary>
         public string Text = "";
+        /// <summary>Hint shown while the field is empty and not focused; null = none.</summary>
         public string Placeholder;
+        /// <summary>Maximum number of characters.</summary>
         public int MaxLength = 256;
+        /// <summary>Several lines; Enter alone submits, Shift+Enter breaks the line.</summary>
         public bool Multiline;
+        /// <summary>The field has the keyboard.</summary>
         public bool Focused;
         private int _caret;
         private float _blink;
@@ -27,6 +32,7 @@ namespace Syntrix.Gui
         private int _repeatKey;
         private int _repeatFrames;
 
+        /// <summary>Creates a text field.</summary>
         public GuiTextField() : base(GuiKind.TextField)
         {
         }

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Syntrix example: a block with the own F action (model of the Vanilla service terminal). -->
+<Definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <CubeBlocks>
+    <Definition xsi:type="MyObjectBuilder_FunctionalBlockDefinition">
+      <Id>
+        <TypeId>FunctionalBlock</TypeId>
+        <SubtypeId>SyntrixExample_Terminal</SubtypeId>
+      </Id>
+      <DisplayName>Syntrix Example Terminal</DisplayName>
+      <Icon>Textures\GUI\Icons\Cubes\ServicesTerminal.dds</Icon>
+      <Description>F opens the window of the Syntrix example, K the terminal.</Description>
+      <CubeSize>Large</CubeSize>
+      <BlockTopology>TriangleMesh</BlockTopology>
+      <Size x="1" y="1" z="1" />
+      <ModelOffset x="0" y="0" z="0" />
+      <Model>Models\Cubes\Large\ServicesTerminal.mwm</Model>
+      <Components>
+        <Component Subtype="SteelPlate" Count="10" />
+      </Components>
+      <CriticalComponent Subtype="SteelPlate" Index="0" />
+      <MountPoints>
+        <MountPoint Side="Bottom" StartX="0.2" StartY="0" EndX="0.8" EndY="0.3" Default="true" />
+        <MountPoint Side="Front" StartX="0" StartY="0" EndX="1" EndY="0.9" />
+      </MountPoints>
+      <BlockPairName>SyntrixExample_Terminal</BlockPairName>
+      <EdgeType>Light</EdgeType>
+      <ScreenAreas>
+        <ScreenArea Name="CockpitScreen_01" DisplayName="DisplayName_Screen_Large" TextureResolution="512" ScreenWidth="10" ScreenHeight="16" />
+      </ScreenAreas>
+      <EmissiveColorPreset>Default</EmissiveColorPreset>
+      <DamageEffectName>Damage_HeavyMech_Damaged</DamageEffectName>
+      <DamagedSound>ParticleHeavyMech</DamagedSound>
+      <BuildTimeSeconds>5</BuildTimeSeconds>
+      <IsAirTight>false</IsAirTight>
+      <PCU>10</PCU>
+    </Definition>
+  </CubeBlocks>
+</Definitions>
