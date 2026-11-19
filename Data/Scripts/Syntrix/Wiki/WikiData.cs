@@ -153,6 +153,43 @@ namespace Syntrix.Wiki
             }
         }
 
+        /// <summary>True if the set names the key ("Type/Subtype"), exactly or by a pattern with * (any text, e.g. "PlanetGeneratorDefinition/*_Kulisse").</summary>
+        public static bool Names(HashSet<string> set, string key)
+        {
+            if (set.Contains(key))
+                return true;
+            foreach (var pattern in set)
+                if (pattern.IndexOf('*') >= 0 && Wildcard(pattern, key))
+                    return true;
+            return false;
+        }
+
+        private static bool Wildcard(string pattern, string text)
+        {
+            var parts = pattern.Split('*');
+            int pos = 0;
+            for (int i = 0; i < parts.Length; i++)
+            {
+                var part = parts[i];
+                if (i == 0)
+                {
+                    if (!text.StartsWith(part, StringComparison.OrdinalIgnoreCase))
+                        return false;
+                    pos = part.Length;
+                }
+                else if (i == parts.Length - 1)
+                    return text.Length - pos >= part.Length && text.EndsWith(part, StringComparison.OrdinalIgnoreCase);
+                else
+                {
+                    int at = text.IndexOf(part, pos, StringComparison.OrdinalIgnoreCase);
+                    if (at < 0)
+                        return false;
+                    pos = at + part.Length;
+                }
+            }
+            return true;
+        }
+
         private void MergeIds(List<DefinitionRefXml> list, HashSet<string> target, string origin, string element)
         {
             if (list == null)

@@ -136,9 +136,9 @@ namespace Syntrix.Wiki
         public static bool Visible(WikiData data, MyDefinitionId id, bool isPublic)
         {
             var key = Key(id);
-            if (data.Shown.Contains(key))
+            if (WikiData.Names(data.Shown, key))
                 return true;
-            return isPublic && !data.Hidden.Contains(key);
+            return isPublic && !WikiData.Names(data.Hidden, key);
         }
 
         /// <summary>"Type/Subtype" without "MyObjectBuilder_" (as in &lt;Hide&gt; and &lt;Show&gt;).</summary>
