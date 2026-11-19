@@ -5,6 +5,7 @@
 - Tabs (`GuiTabs`) use the Vanilla button textures like the tabs of the terminal: normal, hovered and
   pressed for the selected tab. Before, they used the striped toolbar tabs of the G menu, which glowed
   light blue and looked the same for the selected and the hovered tab.
+- Confirmation window (`Gui.Confirm`): text and buttons centred, background a little darker.
 
 ## 1.2.1 (API version 3)
 
