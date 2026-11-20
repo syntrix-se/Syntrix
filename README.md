@@ -37,6 +37,7 @@ Copy the dock files into your mod's script folder and do not edit them:
 | Price requests | one mod gives prices for a service name, others ask with a description and get an amount or "no price" |
 | Block lights | the server sets colour, brightness and blinking of a block's status lights (emissive parts); Syntrix sends it to every player, also to later ones, and paints it again when the game repaints the block |
 | Short sounds | the server plays a short sound at a block or a place for the players within a radius |
+| Reputation | one faction mod defines scale, tiers with trade percent and goods level, start values, limits, links between factions and slow recovery; Syntrix gives the start values once, keeps every value in its limits (also against the game), passes shares on, sends the values to the player's machine, shows the change and raises `Syntrix.Rep.Changed`; `/syxrep` for admins |
 | Wiki | in-game wiki (F11, `/syxwiki`): every loaded mod adds pages with a `Data/Syntrix-Wiki.xml`, no code needed; mods with code add generated pages (`WikiAddSource`) and fill automatic tables (`WikiAddTables`) |
 
 ## Quick start
@@ -141,6 +142,27 @@ if (price < 0)
 _syx.LightsSet(door.EntityId, null, Color.Yellow, 1f, 0.8f);
 _syx.SoundPlay(door.EntityId, "HudUnable", 15);
 _syx.LightsClear(door.EntityId);   // back to the game's own colours
+```
+
+### Reputation (API 5)
+
+```csharp
+// server, faction mod only: scale, tiers and a faction
+_syx.RepDefineScale(0, 30000);
+_syx.RepDefineTiers(new List<MyTuple<string, int, float, int>>
+{
+    new MyTuple<string, int, float, int>("MyMod_TierHostile", 0, 0f, 0),
+    new MyTuple<string, int, float, int>("MyMod_TierNeutral", 12001, 0f, 1),
+    new MyTuple<string, int, float, int>("MyMod_TierFriendly", 18001, 5f, 1),
+});
+_syx.RepDefineFaction("ABC", 15000, 12001, 30000);   // start, never below neutral
+_syx.RepDefineLink("ABC", "XYZ", -0.02f);            // 2 % the other way
+
+// server, any mod: change it (inside the limits, linked factions follow)
+_syx.RepChange(identityId, "ABC", -300, "MyMod.BaseCore");
+
+// everywhere, also on the player's machine: value, tier, percent, goods level
+var info = _syx.RepInfo(identityId, "ABC");
 ```
 
 ### Rich HUD

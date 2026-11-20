@@ -18,6 +18,7 @@ namespace Syntrix
             {
                 core.AdminBlocks.Tick();
                 core.Lights.Tick();
+                core.Rep.Tick();
                 if (core.IsPlayer)
                 {
                     core.Screens.Tick();

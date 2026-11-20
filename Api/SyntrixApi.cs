@@ -1,4 +1,4 @@
-// Syntrix dock file (API version 4, Syntrix 1.3.0). Copy this file into your mod's script folder.
+// Syntrix dock file (API version 5, Syntrix 1.4.0). Copy this file into your mod's script folder.
 // Do not edit it; take a newer copy from the Syntrix repository instead.
 // Windows and screen elements: also copy SyntrixGui.cs (optional dock file of the window service).
 //
@@ -38,7 +38,7 @@ namespace Syntrix.Api
         public const long Channel = 8346120579001L;
 
         /// <summary>API version of this dock file.</summary>
-        public const int ApiVersion = 4;
+        public const int ApiVersion = 5;
 
         /// <summary>Prefix for notification arguments that are text keys themselves.</summary>
         public const char TextArgPrefix = '\u0001';
@@ -248,6 +248,25 @@ namespace Syntrix.Api
         private Action<long, string> _lightsClear;
         private Action<long, string, double> _soundPlay;
         private Action<VRageMath.Vector3D, string, double> _soundPlayAt;
+        // API 5
+        private Action<int, int> _repScale;
+        private Action<List<MyTuple<string, int, float, int>>> _repTiers;
+        private Action<string, int, int, int, int> _repFaction;
+        private Action<string, int, int> _repRecovery;
+        private Action<string, string, float> _repLink;
+        private Action _repClear;
+        private Action<string, string, int> _repBetween;
+        private Func<long, string, int> _repGet;
+        private Func<long, string, MyTuple<int, int, float, int>> _repInfo;
+        private Func<int, int> _repTierOf;
+        private Func<int> _repTierCount;
+        private Func<int, MyTuple<string, int, int, float, int>> _repTier;
+        private Func<MyTuple<int, int>> _repScaleGet;
+        private Func<string, MyTuple<int, int>> _repLimits;
+        private Func<string[]> _repFactions;
+        private Func<long, string, int, string, int, int> _repChange;
+        private Action<long, string, int, string> _repSet;
+        private Action<long> _repReset;
 
         private void Bind()
         {
@@ -304,6 +323,24 @@ namespace Syntrix.Api
             _lightsClear = Get<Action<long, string>>("Lights.Clear");
             _soundPlay = Get<Action<long, string, double>>("Sound.Play");
             _soundPlayAt = Get<Action<VRageMath.Vector3D, string, double>>("Sound.PlayAt");
+            _repScale = Get<Action<int, int>>("Rep.DefineScale");
+            _repTiers = Get<Action<List<MyTuple<string, int, float, int>>>>("Rep.DefineTiers");
+            _repFaction = Get<Action<string, int, int, int, int>>("Rep.DefineFaction");
+            _repRecovery = Get<Action<string, int, int>>("Rep.DefineRecovery");
+            _repLink = Get<Action<string, string, float>>("Rep.DefineLink");
+            _repClear = Get<Action>("Rep.ClearDefinitions");
+            _repBetween = Get<Action<string, string, int>>("Rep.SetBetween");
+            _repGet = Get<Func<long, string, int>>("Rep.Get");
+            _repInfo = Get<Func<long, string, MyTuple<int, int, float, int>>>("Rep.Info");
+            _repTierOf = Get<Func<int, int>>("Rep.TierOf");
+            _repTierCount = Get<Func<int>>("Rep.TierCount");
+            _repTier = Get<Func<int, MyTuple<string, int, int, float, int>>>("Rep.Tier");
+            _repScaleGet = Get<Func<MyTuple<int, int>>>("Rep.Scale");
+            _repLimits = Get<Func<string, MyTuple<int, int>>>("Rep.Limits");
+            _repFactions = Get<Func<string[]>>("Rep.Factions");
+            _repChange = Get<Func<long, string, int, string, int, int>>("Rep.Change");
+            _repSet = Get<Action<long, string, int, string>>("Rep.Set");
+            _repReset = Get<Action<long>>("Rep.ResetStart");
         }
 
         // ---------- info ----------
@@ -681,6 +718,155 @@ namespace Syntrix.Api
         /// <param name="cue">Sound cue name.</param>
         /// <param name="radius">Radius in metres (1 to 200).</param>
         public void SoundPlayAt(VRageMath.Vector3D position, string cue, double radius = 30) { if (_soundPlayAt != null) _soundPlayAt(position, cue, radius); }
+
+        // ---------- reputation (API 5, Syntrix 1.4.0) ----------
+
+        /// <summary>API 5. Event name of a reputation change; payload MyTuple&lt;long identity, string tag, int old, int new, string reason&gt;.</summary>
+        public const string RepChangedEvent = "Syntrix.Rep.Changed";
+        /// <summary>API 5. <see cref="RepChange"/> flag: pass a share on to linked factions (<see cref="RepDefineLink"/>).</summary>
+        public const int RepPropagate = 1;
+        /// <summary>API 5. <see cref="RepChange"/> flag: no notice of the amount (tier changes are still shown).</summary>
+        public const int RepQuiet = 2;
+
+        /// <summary>
+        /// API 5. Server, one mod only (the faction mod): lowest and highest value of the scale; also the limits of every
+        /// faction without own limits. Without it the scale is -1500 to 1500 (Vanilla). Players get every definition from
+        /// the server. May be called before ready.
+        /// </summary>
+        /// <param name="min">Lowest value.</param>
+        /// <param name="max">Highest value.</param>
+        public void RepDefineScale(int min, int max) { WhenReady(() => { if (_repScale != null) _repScale(min, max); }); }
+
+        /// <summary>
+        /// API 5. Server: the tiers, each (text key of the name, lowest value, trade percent, goods level). The percent is
+        /// the discount on buying and the markup on selling; goods level 0 means no trade, higher levels open better goods.
+        /// </summary>
+        /// <param name="tiers">Tiers in any order.</param>
+        public void RepDefineTiers(List<MyTuple<string, int, float, int>> tiers) { WhenReady(() => { if (_repTiers != null) _repTiers(tiers); }); }
+
+        /// <summary>
+        /// API 5. Server: a faction. Syntrix gives each player the start value once (the first time the player is seen
+        /// with this definition) and keeps the value between min and max, also against changes by the game or other mods.
+        /// </summary>
+        /// <param name="tag">Faction tag.</param>
+        /// <param name="start">Start value, int.MinValue = none.</param>
+        /// <param name="min">Lowest value (int.MinValue = scale).</param>
+        /// <param name="max">Highest value (int.MaxValue = scale).</param>
+        /// <param name="tradeFrom">Lowest tier index that trades (basic goods, 0 %) even if the tier itself does not; -1 = as the tier says.</param>
+        public void RepDefineFaction(string tag, int start, int min = int.MinValue, int max = int.MaxValue, int tradeFrom = -1)
+        {
+            WhenReady(() => { if (_repFaction != null) _repFaction(tag, start, min, max, tradeFrom); });
+        }
+
+        /// <summary>API 5. Server: while a player is online the value rises by perHour points per hour, up to upTo.</summary>
+        /// <param name="tag">Faction tag.</param>
+        /// <param name="perHour">Points per online hour, 0 = off.</param>
+        /// <param name="upTo">Value where it stops.</param>
+        public void RepDefineRecovery(string tag, int perHour, int upTo) { WhenReady(() => { if (_repRecovery != null) _repRecovery(tag, perHour, upTo); }); }
+
+        /// <summary>
+        /// API 5. Server: a change at "from" made with <see cref="RepPropagate"/> also changes "to" by factor times the
+        /// applied change (0.05 = 5 % the same way, -0.02 = 2 % the other way), inside the limits of "to". One step only.
+        /// </summary>
+        /// <param name="from">Faction tag that changes.</param>
+        /// <param name="to">Faction tag that follows.</param>
+        /// <param name="factor">Share, negative = the other way, 0 removes the link.</param>
+        public void RepDefineLink(string from, string to, float factor) { WhenReady(() => { if (_repLink != null) _repLink(from, to, factor); }); }
+
+        /// <summary>API 5. Server: forgets all definitions, before defining them again (for example after reloading a settings file).</summary>
+        public void RepClearDefinitions() { WhenReady(() => { if (_repClear != null) _repClear(); }); }
+
+        /// <summary>API 5. Server: reputation between two factions both ways, also on every player's machine (also later ones).</summary>
+        /// <param name="tagA">First faction tag.</param>
+        /// <param name="tagB">Second faction tag.</param>
+        /// <param name="value">Value on the scale.</param>
+        public void RepSetBetween(string tagA, string tagB, int value) { WhenReady(() => { if (_repBetween != null) _repBetween(tagA, tagB, value); }); }
+
+        /// <summary>API 5. Value of a player with a faction; int.MinValue if the faction does not exist or the framework is missing.</summary>
+        /// <param name="identity">Player identity id.</param>
+        /// <param name="tag">Faction tag.</param>
+        public int RepGet(long identity, string tag) { return _repGet != null ? _repGet(identity, tag) : int.MinValue; }
+
+        /// <summary>
+        /// API 5. Value, tier index (-1 = none), trade percent and goods level (0 = no trade) of a player with a faction.
+        /// Works on the server and on the player's own machine.
+        /// </summary>
+        /// <param name="identity">Player identity id.</param>
+        /// <param name="tag">Faction tag.</param>
+        public MyTuple<int, int, float, int> RepInfo(long identity, string tag)
+        {
+            return _repInfo != null ? _repInfo(identity, tag) : new MyTuple<int, int, float, int>(int.MinValue, -1, 0f, 0);
+        }
+
+        /// <summary>API 5. Tier index of a value, -1 when no tiers are defined.</summary>
+        /// <param name="value">Value on the scale.</param>
+        public int RepTierOf(int value) { return _repTierOf != null ? _repTierOf(value) : -1; }
+
+        /// <summary>API 5. Number of tiers.</summary>
+        public int RepTierCount { get { return _repTierCount != null ? _repTierCount() : 0; } }
+
+        /// <summary>API 5. Tier: text key of the name, lowest and highest value, trade percent, goods level.</summary>
+        /// <param name="index">Tier index.</param>
+        public MyTuple<string, int, int, float, int> RepTier(int index)
+        {
+            return _repTier != null ? _repTier(index) : new MyTuple<string, int, int, float, int>(null, 0, 0, 0f, 0);
+        }
+
+        /// <summary>API 5. Lowest and highest value of the scale.</summary>
+        public MyTuple<int, int> RepScale { get { return _repScaleGet != null ? _repScaleGet() : new MyTuple<int, int>(-1500, 1500); } }
+
+        /// <summary>API 5. Lowest and highest allowed value of a faction.</summary>
+        /// <param name="tag">Faction tag.</param>
+        public MyTuple<int, int> RepLimits(string tag) { return _repLimits != null ? _repLimits(tag) : new MyTuple<int, int>(-1500, 1500); }
+
+        /// <summary>API 5. Tags of the defined factions, sorted; empty without framework.</summary>
+        public string[] RepFactions() { return _repFactions != null ? _repFactions() : new string[0]; }
+
+        /// <summary>
+        /// API 5. Server: changes a player's value inside the faction's limits and returns the applied change. The player
+        /// sees a notice of the amount (summed up over two seconds) unless <see cref="RepQuiet"/>, and always a notice
+        /// when the tier changes.
+        /// </summary>
+        /// <param name="identity">Player identity id.</param>
+        /// <param name="tag">Faction tag.</param>
+        /// <param name="delta">Change.</param>
+        /// <param name="reason">Reason for the event, e.g. "Npc.Kill".</param>
+        /// <param name="flags"><see cref="RepPropagate"/>, <see cref="RepQuiet"/>.</param>
+        public int RepChange(long identity, string tag, int delta, string reason, int flags = RepPropagate)
+        {
+            return _repChange != null ? _repChange(identity, tag, delta, reason, flags) : 0;
+        }
+
+        /// <summary>API 5. Server: sets a player's value inside the faction's limits (no notice of the amount).</summary>
+        /// <param name="identity">Player identity id.</param>
+        /// <param name="tag">Faction tag.</param>
+        /// <param name="value">New value.</param>
+        /// <param name="reason">Reason for the event.</param>
+        public void RepSet(long identity, string tag, int value, string reason) { if (_repSet != null) _repSet(identity, tag, value, reason); }
+
+        /// <summary>API 5. Server: gives a player the start values of all defined factions again.</summary>
+        /// <param name="identity">Player identity id.</param>
+        public void RepResetStart(long identity) { if (_repReset != null) _repReset(identity); }
+
+        /// <summary>
+        /// API 5. Handler for every reputation change (identity, tag, old, new, reason), on the server and on the player's
+        /// own machine. May be called before ready.
+        /// </summary>
+        /// <param name="handler">Handler.</param>
+        /// <returns>The subscription, for <see cref="Unsubscribe"/> with <see cref="RepChangedEvent"/>.</returns>
+        public Action<object> RepOnChanged(Action<long, string, int, int, string> handler)
+        {
+            Action<object> h = o =>
+            {
+                if (o is MyTuple<long, string, int, int, string>)
+                {
+                    var t = (MyTuple<long, string, int, int, string>)o;
+                    handler(t.Item1, t.Item2, t.Item3, t.Item4, t.Item5);
+                }
+            };
+            Subscribe(RepChangedEvent, h);
+            return h;
+        }
 
         // ---------- helpers without endpoint (1.3.0) ----------
 

@@ -239,6 +239,10 @@ namespace SyntrixExample
                 _syx.SendEventToAll(EventWatched, door.CustomName, value);
             });
 
+            // Reputation (API 5): every change of a player's reputation, here and on the player's machine.
+            _syx.RepOnChanged((identity, tag, old, now, reason) =>
+                _log.Info("reputation " + identity + " " + tag + ": " + old + " -> " + now + " (" + reason + ")"));
+
             // Chat command handled on the server.
             _syx.ChatRegister("syxexample", MyPromoteLevel.None, true, "count watched doors", (sender, args) =>
             {
