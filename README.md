@@ -38,6 +38,9 @@ Copy the dock files into your mod's script folder and do not edit them:
 | Block lights | the server sets colour, brightness and blinking of a block's status lights (emissive parts); Syntrix sends it to every player, also to later ones, and paints it again when the game repaints the block |
 | Short sounds | the server plays a short sound at a block or a place for the players within a radius |
 | Reputation | one faction mod defines scale, tiers with trade percent and goods level, start values, limits, links between factions and slow recovery; Syntrix gives the start values once, keeps every value in its limits (also against the game), passes shares on, sends the values to the player's machine, shows the change and raises `Syntrix.Rep.Changed`; `/syxrep` for admins |
+| Accounts (API 6) | player and faction money with one check per frame, `Syntrix.Account.Changed` for every change |
+| Reputation gate and price (API 6) | lowest goods level per block type or block (also Vanilla blocks such as stores), price after the player's trade percent |
+| World clock (API 6) | one world date and local time of day for all mods, settings in the world storage, planet calendars, event controller events, script properties, AutoLCD commands, `/syxtime` |
 | Wiki | in-game wiki (F11, `/syxwiki`): every loaded mod adds pages with a `Data/Syntrix-Wiki.xml`, no code needed; mods with code add generated pages (`WikiAddSource`) and fill automatic tables (`WikiAddTables`) |
 
 ## Quick start
@@ -163,6 +166,23 @@ _syx.RepChange(identityId, "ABC", -300, "MyMod.BaseCore");
 
 // everywhere, also on the player's machine: value, tier, percent, goods level
 var info = _syx.RepInfo(identityId, "ABC");
+```
+
+### Accounts, reputation gate, world clock (API 6)
+
+```csharp
+// all machines: Vanilla stores refuse players below goods level 1
+_syx.RepGateType("MyObjectBuilder_StoreBlock", 1);
+
+// server: charge the price after the player's trade percent
+long price = _syx.RepPrice(identityId, "ABC", 500, true);
+if (!_syx.AccountCharge(identityId, price, "MyMod.Repair"))
+    return;   // not enough money or player offline
+
+// everywhere: world date and the local time of day at a place
+string date = _syx.TimeWorldText();
+string local = _syx.TimeLocalText(position);
+_syx.Subscribe(SyntrixApi.TimeNewDayEvent, payload => OnNewDay());
 ```
 
 ### Rich HUD

@@ -33,7 +33,9 @@ Space Engineers mod which uses Syntrix, or that work on Syntrix itself. Humans a
    "Wiki"). Generated pages and automatic tables come through `WikiAddSource` and `WikiAddTables`.
 10. Own F action on a block: `UseRegister("TypeId/SubtypeId", hintKey, handler)` plus the
    UseObjectsComponent `SyntrixUse` (shipped by Syntrix, API 4) in the block's entity container.
-11. Check in game: `/syntrix` in chat lists the docked mods. Problems are in the game log, lines
+11. Money, prices after reputation and the time of day come from Syntrix (API 6): `AccountCharge`,
+   `AccountPay`, `RepPrice`, `TimeWorldText`, `TimeLocal`. Do not write own account or clock code.
+12. Check in game: `/syntrix` in chat lists the docked mods. Problems are in the game log, lines
    start with `Syntrix` or with the mod name.
 
 ## Space Engineers script rules that trip assistants

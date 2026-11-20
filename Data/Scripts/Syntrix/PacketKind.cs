@@ -45,5 +45,12 @@ namespace Syntrix
         Reputation = 14,
         /// <summary>A player asks for the reputation definitions and its values.</summary>
         ReputationRequest = 15,
+
+        // API 6 (Syntrix 1.5.0)
+
+        /// <summary>Clock answer and world clock settings from the server.</summary>
+        Time = 16,
+        /// <summary>A player asks for the server clock (its own send time in Data).</summary>
+        TimeRequest = 17,
     }
 }

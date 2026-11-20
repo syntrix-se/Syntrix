@@ -1,5 +1,48 @@
 # Changelog
 
+## 1.5.0 (API version 6)
+
+Dock files of API versions 1 to 5 keep working; no endpoint was removed. Copy the new `Api/SyntrixApi.cs`
+to use accounts, the reputation gate and price, and the world clock.
+
+### Accounts
+
+- `Account.Balance`, `Account.Charge`, `Account.Pay` for player money (balance -1 while the player is
+  offline; charges and payments of the same frame are counted together, so two charges cannot both pass),
+  `Account.FactionBalance`, `Account.FactionChange` for faction accounts.
+- Event `Syntrix.Account.Changed` (identity, faction tag, delta, reason) on the server.
+- Dock file: `AccountBalance`, `AccountCharge`, `AccountPay`, `AccountFactionBalance`,
+  `AccountFactionChange`, constant `AccountChangedEvent`.
+
+### Reputation gate and price
+
+- `Rep.Price` applies the trade percent of the player's tier to a price (player buys: lower, player
+  sells: higher).
+- `Rep.GateType` and `Rep.GateBlock` give block types or single blocks a lowest goods level; the gate of
+  1.4.1 now also closes K and F at such blocks without the use object `SyntrixUse` (Vanilla stores, for
+  example). `Rep.Refuses` and `Rep.MinGoods` ask for it.
+- Dock file: `RepPrice`, `RepRefuses`, `RepGateType`, `RepGateBlock`, `RepMinGoods`.
+
+### Prices
+
+- `Price.Changed` raises `Syntrix.Price.Changed` (service name) when a price giver changes its prices.
+  Dock file: `PriceChanged`, constant `PriceChangedEvent`.
+
+### World clock
+
+- One world clock for all mods: start date, time factor, year length and planet calendars in the world
+  storage (`Syntrix-Time.xml`, written with defaults by the server). Players get the server's clock and
+  settings (packet kinds 16 and 17).
+- Local time of day from the sun position at a place, optional sun alignment and sky rotation.
+- Endpoints `Time.Utc`, `Time.WorldDays`, `Time.WorldDate`, `Time.WorldText`, `Time.Local`,
+  `Time.LocalText`, `Time.Calendar`, `Time.IsNight`; dock file `TimeUtc`, `TimeWorldDays`,
+  `TimeWorldDate`, `TimeWorldText`, `TimeLocal`, `TimeLocalText`, `TimeCalendar`, `TimeIsNight`.
+- Events `Syntrix.Time.NewDay` (server) and `Syntrix.Time.Hud` (player, HUD values); constants
+  `TimeNewDayEvent`, `TimeHudEvent`.
+- Event controller events "time of day" and "day/night", programmable block properties `Syx.LocalTime`,
+  `Syx.Night`, `Syx.SunHeight`, `Syx.WorldTime`, `Syx.WorldYear`, `Syx.WorldDay`, `Syx.WorldHour`,
+  `Syx.Calendar`; AutoLCD commands `WorldTime` and `LocalTime`; chat command `/syxtime`.
+
 ## 1.4.1 (API version 5)
 
 No new endpoints; dock files stay valid.

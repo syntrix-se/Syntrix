@@ -60,6 +60,16 @@ namespace Syntrix.Price
             }
         }
 
+        /// <summary>Event raised where <see cref="Changed"/> is called (usually the server); payload: the service name.</summary>
+        public const string ChangedEvent = "Syntrix.Price.Changed";
+
+        /// <summary>API 6: a price giver tells the askers that its prices of a service changed (they ask again).</summary>
+        public void Changed(SyntrixCore core, string service)
+        {
+            if (!string.IsNullOrEmpty(service))
+                core.Events.Publish(ChangedEvent, service);
+        }
+
         /// <summary>Forgets all price givers.</summary>
         public void Stop() { _givers.Clear(); }
     }
