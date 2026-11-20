@@ -46,7 +46,7 @@ namespace Syntrix.AutoLcd
                         return LcdText.Get("SyxAutoLcd_ChatHelp",
                             "/syxlcd scroll up|down \"screen name\" [lines] - scroll screens near you\n"
                             + "/syxlcd stats - load per construct (admin)\n"
-                            + "/syxlcd reload - read SyntrixAutoLcd.xml again (admin)\n"
+                            + "/syxlcd reload - read Syntrix-AutoLcd.xml again (admin)\n"
                             + "/syxlcd pause | resume - stop or restart all screens (admin)\n"
                             + "Screens: !LCD! or [LCD] in the name, commands in the custom data.");
                 }
