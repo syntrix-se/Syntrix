@@ -1,5 +1,76 @@
 # Changelog
 
+## 1.3.0 (API version 4)
+
+Dock files of API versions 1 to 3 keep working; no endpoint was removed. Copy the new `Api/SyntrixApi.cs`
+to use the new services. Contains the changes of 1.2.2.
+
+### Shared use object
+
+- UseObjectsComponent `SyntrixUse` (in `Data/EntityComponents_Syntrix.sbc`, `UseObjectTypeOverride`
+  `syntrix`): a mod puts it into the entity container of its block and needs no own definition. Without a
+  registered F action, F opens the terminal of the block.
+
+### Grid storage (server)
+
+- A mechanical grid group becomes a text (blueprint with the block storage, relative to a reference
+  frame, plus its outline) and back, with a space check. Ids are kept when all are free, otherwise the
+  whole collection gets new ones. The mod keeps the text itself.
+- Endpoints `Grids.Nearby`, `Grids.Capture`, `Grids.Spawn`, `Grids.Fits`; in the dock file
+  `GridsNearby`, `GridsCapture`, `GridsSpawn`, `GridsFits` and the constants `Grid*`.
+
+### Fixed screens (players)
+
+- A mod hands over the content of a block's screen as lines (title with symbol, alarm bar, name,
+  small, value, hint, foot, gap); Syntrix draws it in one board style within 150 m, only when it
+  changed, and removes the screen settings of the block from the K menu.
+- Endpoints `Screen.Register`, `Screen.Refresh`; in the dock file `ScreenRegister`, `ScreenRefresh`,
+  `ScreenLine`, `ScreenTitle`.
+
+### Admin only blocks
+
+- Registered block types are in the G menu only for admins; the server razes such a block again when a
+  player without admin rank starts to build it or welds it from a projection, with the mod's notice.
+- Endpoints `Admin.RegisterBlock`, `Admin.UnregisterBlock`; in the dock file `AdminBlockRegister`,
+  `AdminBlockUnregister`.
+
+### Price requests
+
+- A mod registers as price giver for a service name; other mods ask with a description ("key=value"
+  lines) and get an amount, or -1 for "no price" and use their own.
+- Endpoints `Price.Register`, `Price.Has`, `Price.Ask`; in the dock file `PriceRegister`, `PriceHas`,
+  `PriceAsk`, `PriceLine`.
+
+### Block lights
+
+- The server sets colour, brightness and blinking of an emissive part of a block (status lights). Syntrix
+  keeps the state, sends it to every player (also to players who join later) and paints it again within
+  300 m when the game repaints the block. Not saved. Clearing gives the part back to the game.
+- Endpoints `Lights.Set`, `Lights.Clear`; in the dock file `LightsSet`, `LightsClear`.
+
+### Short sounds
+
+- The server plays a short sound at a block or a place for the players within a radius (up to 200 m).
+- Endpoints `Sound.Play`, `Sound.PlayAt`; in the dock file `SoundPlay`, `SoundPlayAt`.
+
+### Dock file helpers
+
+- `NotifyNear` (notification to the players near a place), `PlayersNear`, `PlayersIn` (players near a
+  place or inside a box), `SyntrixControls<T>.Combo` with entries per block and
+  `SyntrixControls<T>.CurrentBlock`.
+
+## 1.2.2 (API version 3)
+
+- Tabs (`GuiTabs`) use the Vanilla button textures like the tabs of the terminal: normal, hovered and
+  pressed for the selected tab. Before, they used the striped toolbar tabs of the G menu, which glowed
+  light blue and looked the same for the selected and the hovered tab.
+- Confirmation window (`Gui.Confirm`): text and buttons centred, background a little darker.
+
+## 1.2.1 (API version 3)
+
+- Materials `SyxGui_GridLarge` and `SyxGui_GridSmall`: the grid size symbols of the G menu, for icons
+  in lists of grids.
+
 ## 1.2.0 (API version 3)
 
 Dock files of API versions 1 and 2 keep working. No endpoint was removed; the `Ui.*` endpoints of

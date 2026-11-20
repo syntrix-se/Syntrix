@@ -292,13 +292,16 @@ namespace Syntrix.Gui
                 Title = title,
                 WindowSize = new Vector2(0.42f, 0.30f),
                 Pause = false,
+                Color = new Color(0, 0, 0, 70),   // a little darker than the plain window (1.2.2)
             };
             var stack = new GuiStack { FillWidth = true, FillHeight = true, Spacing = 16f };
             w.Add(stack);
-            var label = new GuiLabel { Text = text ?? "", FillWidth = true };
+            // text and buttons centred (1.2.2); the row takes the full width, so the buttons sit between two fill spacers
+            var label = new GuiLabel { Text = "[align=center]" + (text ?? "") + "[/align]", FillWidth = true };
             stack.Add(label);
-            var row = new GuiStack { Horizontal = true, Spacing = 12f, Anchor = 1 };
+            var row = new GuiStack { Horizontal = true, Spacing = 12f, FillWidth = true };
             stack.Add(row);
+            row.Add(new GuiLabel { Text = "", FillWidth = true });
             bool answered = false;
             Action<bool> reply = ok =>
             {
@@ -321,6 +324,7 @@ namespace Syntrix.Gui
                 noButton.Handler = (e, ev, i, t) => { if (ev == GuiEvent.Click && i == 0) reply(false); };
                 row.Add(noButton);
             }
+            row.Add(new GuiLabel { Text = "", FillWidth = true });
             return w.Open();
         }
     }

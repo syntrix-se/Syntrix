@@ -31,8 +31,8 @@ Space Engineers mod which uses Syntrix, or that work on Syntrix itself. Humans a
    toolbar actions or script properties are needed there.
 9. Wiki pages need no code: put a `Data/Syntrix-Wiki.xml` into the mod (format in the wiki page
    "Wiki"). Generated pages and automatic tables come through `WikiAddSource` and `WikiAddTables`.
-10. Own F action on a block: `UseRegister("TypeId/SubtypeId", hintKey, handler)` plus a
-   UseObjectsComponent with `UseObjectTypeOverride` `syntrix` in the block's entity container.
+10. Own F action on a block: `UseRegister("TypeId/SubtypeId", hintKey, handler)` plus the
+   UseObjectsComponent `SyntrixUse` (shipped by Syntrix, API 4) in the block's entity container.
 11. Check in game: `/syntrix` in chat lists the docked mods. Problems are in the game log, lines
    start with `Syntrix` or with the mod name.
 

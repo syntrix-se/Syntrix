@@ -2090,5 +2090,54 @@
         <Y>1</Y>
       </UVSize>
     </TransparentMaterial>
+    <!-- Grid size symbols of the G menu (large: filled square, small: outline); for lists of grids -->
+    <TransparentMaterial>
+      <Id>
+        <TypeId>TransparentMaterialDefinition</TypeId>
+        <SubtypeId>SyxGui_GridLarge</SubtypeId>
+      </Id>
+      <AlphaMistingEnable>false</AlphaMistingEnable>
+      <CanBeAffectedByOtherLights>false</CanBeAffectedByOtherLights>
+      <AlphaSaturation>1</AlphaSaturation>
+      <Emissivity>0</Emissivity>
+      <IgnoreDepth>false</IgnoreDepth>
+      <NeedSort>false</NeedSort>
+      <SoftParticleDistanceScale>0</SoftParticleDistanceScale>
+      <Texture>Textures\GUI\Icons\HUD 2017\GridSizeLargeFit.png</Texture>
+      <Reflectivity>0</Reflectivity>
+      <UseAtlas>false</UseAtlas>
+      <UVOffset>
+        <X>0</X>
+        <Y>0</Y>
+      </UVOffset>
+      <UVSize>
+        <X>1</X>
+        <Y>1</Y>
+      </UVSize>
+    </TransparentMaterial>
+    <TransparentMaterial>
+      <Id>
+        <TypeId>TransparentMaterialDefinition</TypeId>
+        <SubtypeId>SyxGui_GridSmall</SubtypeId>
+      </Id>
+      <AlphaMistingEnable>false</AlphaMistingEnable>
+      <CanBeAffectedByOtherLights>false</CanBeAffectedByOtherLights>
+      <AlphaSaturation>1</AlphaSaturation>
+      <Emissivity>0</Emissivity>
+      <IgnoreDepth>false</IgnoreDepth>
+      <NeedSort>false</NeedSort>
+      <SoftParticleDistanceScale>0</SoftParticleDistanceScale>
+      <Texture>Textures\GUI\Icons\HUD 2017\GridSizeSmallFit.png</Texture>
+      <Reflectivity>0</Reflectivity>
+      <UseAtlas>false</UseAtlas>
+      <UVOffset>
+        <X>0</X>
+        <Y>0</Y>
+      </UVOffset>
+      <UVSize>
+        <X>1</X>
+        <Y>1</Y>
+      </UVSize>
+    </TransparentMaterial>
   </TransparentMaterials>
 </Definitions>

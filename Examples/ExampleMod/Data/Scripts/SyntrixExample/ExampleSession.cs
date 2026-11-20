@@ -49,6 +49,12 @@ namespace SyntrixExample
             // Players only. The hint is a text key (MyTexts, "{0}" = the key); null shows "[F] Use".
             _syx.UseRegister(ExampleBlock, null, (entityId, action) => OpenWindow(entityId));
 
+            // API 4: the screen of the example block as a fixed board (players only), redrawn when the text changes.
+            _syx.ScreenRegister(ExampleBlock, 0, entityId =>
+                SyntrixApi.ScreenTitle(null, "Syntrix")
+                + SyntrixApi.ScreenLine('V', "Clicks: " + _clicks)
+                + SyntrixApi.ScreenLine('F', "[{F}] open window"));
+
             // Terminal controls are only described here; Syntrix creates them when a door is first seen.
             SyntrixControls<IMyDoor>.Checkbox(_syx, "SyntrixExample_Watch", "SyntrixExample_Watch", "SyntrixExample_Watch_Tooltip",
                 Mod, "watch", false);
@@ -205,6 +211,13 @@ namespace SyntrixExample
         {
             _log.Info("docked to Syntrix " + _syx.FrameworkVersion);
 
+            // API 4: a price from a price giver (e.g. an economy mod), otherwise the own one.
+            if (_syx.IsServer)
+            {
+                long price = _syx.PriceAsk("SyntrixExample.Greeting", SyntrixApi.PriceLine("blocks", "1"));
+                _log.Info("greeting costs " + (price < 0 ? "nothing (no price giver)" : price.ToString()));
+            }
+
             // Runs on the server when a player ticks the box (after the access check) and on every player.
             _syx.BlockOnChanged(Mod, (entityId, key, value) =>
             {
@@ -214,6 +227,14 @@ namespace SyntrixExample
                 if (door == null)
                     return;
                 _syx.Notify(0, "SyntrixExample_Changed", "Door {0}: watch {1}", new[] { door.CustomName, value });
+                // 1.3.0: watched doors blink blue, with a short sound for the players within 15 m
+                if (value == "1")
+                {
+                    _syx.LightsSet(entityId, null, new VRageMath.Color(80, 160, 255), 1f, 1f);
+                    _syx.SoundPlay(entityId, "HudClick", 15);
+                }
+                else
+                    _syx.LightsClear(entityId);
                 // To subscribers of this event on the server and on every player.
                 _syx.SendEventToAll(EventWatched, door.CustomName, value);
             });

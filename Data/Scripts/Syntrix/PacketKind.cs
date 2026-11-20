@@ -29,5 +29,14 @@ namespace Syntrix
         SettingsValue = 9,
         /// <summary>A player asks for a settings text.</summary>
         SettingsRequest = 10,
+
+        // API 4 (Syntrix 1.3.0)
+
+        /// <summary>Block lights from the server (set or clear).</summary>
+        Lights = 11,
+        /// <summary>A player asks for all current block lights.</summary>
+        LightsRequest = 12,
+        /// <summary>A short sound at a block or a place.</summary>
+        Sound = 13,
     }
 }

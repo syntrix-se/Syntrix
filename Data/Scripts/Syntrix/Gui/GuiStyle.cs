@@ -138,10 +138,13 @@ namespace Syntrix.Gui
         public const string ItemHover = C + "item_highlight_dark";
         /// <summary>Texture of a selected list row.</summary>
         public const string ItemSelected = C + "item_active_dark";
-        /// <summary>Texture of a tab.</summary>
-        public const string Tab = C + "ToolBarTab";
+        /// <summary>Texture of a tab: the Vanilla button, as on the tabs of Keen's terminal (the striped toolbar tabs of the G menu
+        /// glowed too bright, 1.2.2).</summary>
+        public const string Tab = Button;
         /// <summary>Texture of a tab, hovered.</summary>
-        public const string TabHover = C + "ToolBarTab_highlight";
+        public const string TabHover = ButtonHover;
+        /// <summary>Texture of the selected tab.</summary>
+        public const string TabSelected = ButtonPressed;
         /// <summary>Texture of the right arrow button.</summary>
         public const string ArrowRight = C + "button_arrow_right";
         /// <summary>Texture of the right arrow button, hovered.</summary>
