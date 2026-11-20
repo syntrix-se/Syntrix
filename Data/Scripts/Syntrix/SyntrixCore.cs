@@ -8,6 +8,7 @@ using VRage.Game;
 using VRage.Game.Components;
 using VRage.Game.ModAPI;
 using Syntrix.Blocks;
+using Syntrix.Effects;
 using Syntrix.Grids;
 using Syntrix.Gui;
 using Syntrix.Price;
@@ -66,6 +67,10 @@ namespace Syntrix
         public AdminBlocks AdminBlocks;
         /// <summary>Price requests (API 4).</summary>
         public PriceService Prices;
+        /// <summary>Block lights (API 4, 1.3.0).</summary>
+        public LightService Lights;
+        /// <summary>Short sounds at a block or a place (API 4, 1.3.0).</summary>
+        public SoundService Sounds;
 
         private readonly Dictionary<string, int> _docked = new Dictionary<string, int>();
         private string _instanceKey;
@@ -107,11 +112,14 @@ namespace Syntrix
             Screens = new ScreenService(this, Watch);
             AdminBlocks = new AdminBlocks(this, Watch);
             Prices = new PriceService();
+            Lights = new LightService(this);
+            Sounds = new SoundService(this);
             Net.Start();
             Blocks.Start();
             Chat.Start();
             Settings.Start();
             Wiki.Start();
+            Lights.Start();
             Started = true;
 
             Log.Info("Syntrix " + Protocol.VersionText + " (API " + Protocol.ApiVersion + ") started, " + (IsServer ? "server" : "client") + (IsPlayer ? " with player" : ""));
@@ -129,6 +137,8 @@ namespace Syntrix
                 Screens.Stop();
                 AdminBlocks.Stop();
                 Prices.Stop();
+                Lights.Stop();
+                Sounds.Stop();
                 Watch.Stop();
                 Gui.Stop();
                 Use.Stop();
@@ -332,6 +342,12 @@ namespace Syntrix
             d["Price.Register"] = new Action<string, Func<string, string, long>>((service, giver) => Prices.Register(modName, service, giver));
             d["Price.Has"] = new Func<string, bool>(Prices.Has);
             d["Price.Ask"] = new Func<string, string, long>((service, description) => Prices.Ask(modName, service, description));
+
+            // API 4 (1.3.0): block lights and short sounds
+            d["Lights.Set"] = new Action<long, string, Color, float, float>(Lights.Set);
+            d["Lights.Clear"] = new Action<long, string>(Lights.Clear);
+            d["Sound.Play"] = new Action<long, string, double>(Sounds.Play);
+            d["Sound.PlayAt"] = new Action<Vector3D, string, double>(Sounds.PlayAt);
 
             // Wiki (API 3)
             d["Wiki.Open"] = new Func<string, bool>(Wiki.Open);

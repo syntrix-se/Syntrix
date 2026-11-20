@@ -41,6 +41,24 @@ to use the new services. Contains the changes of 1.2.2.
 - Endpoints `Price.Register`, `Price.Has`, `Price.Ask`; in the dock file `PriceRegister`, `PriceHas`,
   `PriceAsk`, `PriceLine`.
 
+### Block lights
+
+- The server sets colour, brightness and blinking of an emissive part of a block (status lights). Syntrix
+  keeps the state, sends it to every player (also to players who join later) and paints it again within
+  300 m when the game repaints the block. Not saved. Clearing gives the part back to the game.
+- Endpoints `Lights.Set`, `Lights.Clear`; in the dock file `LightsSet`, `LightsClear`.
+
+### Short sounds
+
+- The server plays a short sound at a block or a place for the players within a radius (up to 200 m).
+- Endpoints `Sound.Play`, `Sound.PlayAt`; in the dock file `SoundPlay`, `SoundPlayAt`.
+
+### Dock file helpers
+
+- `NotifyNear` (notification to the players near a place), `PlayersNear`, `PlayersIn` (players near a
+  place or inside a box), `SyntrixControls<T>.Combo` with entries per block and
+  `SyntrixControls<T>.CurrentBlock`.
+
 ## 1.2.2 (API version 3)
 
 - Tabs (`GuiTabs`) use the Vanilla button textures like the tabs of the terminal: normal, hovered and

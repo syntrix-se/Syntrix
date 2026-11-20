@@ -244,6 +244,10 @@ namespace Syntrix.Api
         private Action<string, Func<string, string, long>> _priceRegister;
         private Func<string, bool> _priceHas;
         private Func<string, string, long> _priceAsk;
+        private Action<long, string, VRageMath.Color, float, float> _lightsSet;
+        private Action<long, string> _lightsClear;
+        private Action<long, string, double> _soundPlay;
+        private Action<VRageMath.Vector3D, string, double> _soundPlayAt;
 
         private void Bind()
         {
@@ -296,6 +300,10 @@ namespace Syntrix.Api
             _priceRegister = Get<Action<string, Func<string, string, long>>>("Price.Register");
             _priceHas = Get<Func<string, bool>>("Price.Has");
             _priceAsk = Get<Func<string, string, long>>("Price.Ask");
+            _lightsSet = Get<Action<long, string, VRageMath.Color, float, float>>("Lights.Set");
+            _lightsClear = Get<Action<long, string>>("Lights.Clear");
+            _soundPlay = Get<Action<long, string, double>>("Sound.Play");
+            _soundPlayAt = Get<Action<VRageMath.Vector3D, string, double>>("Sound.PlayAt");
         }
 
         // ---------- info ----------
@@ -634,6 +642,99 @@ namespace Syntrix.Api
         /// <param name="key">Key.</param>
         /// <param name="value">Value.</param>
         public static string PriceLine(string key, string value) { return Clean(key).Replace("=", "") + "=" + Clean(value) + "\n"; }
+
+        // ---------- block lights (API 4, Syntrix 1.3.0) ----------
+
+        /// <summary>
+        /// API 4 (1.3.0). Colour and blinking of an emissive part of a block (status lights). Call it on the server: Syntrix
+        /// keeps the state, sends it to every player (also to later ones) and paints it again when the game repaints the
+        /// block (on, off, damage). Not saved; set it again after a restart. On a player it changes only that view.
+        /// </summary>
+        /// <param name="entityId">Block entity id.</param>
+        /// <param name="part">Emissive material name, null = "Emissive" (the status lights of most blocks).</param>
+        /// <param name="color">Colour.</param>
+        /// <param name="emissivity">Brightness 0 to 1.</param>
+        /// <param name="blink">Blink period in seconds (half on, half off), 0 = steady.</param>
+        public void LightsSet(long entityId, string part, VRageMath.Color color, float emissivity = 1f, float blink = 0f)
+        {
+            if (_lightsSet != null) _lightsSet(entityId, part, color, emissivity, blink);
+        }
+
+        /// <summary>API 4 (1.3.0). Gives an emissive part (null = all parts set by mods) back to the game.</summary>
+        /// <param name="entityId">Block entity id.</param>
+        /// <param name="part">Emissive material name, null = all.</param>
+        public void LightsClear(long entityId, string part = null) { if (_lightsClear != null) _lightsClear(entityId, part); }
+
+        // ---------- short sounds (API 4, Syntrix 1.3.0) ----------
+
+        /// <summary>
+        /// API 4 (1.3.0). Plays a short sound at a block for every player within the radius (server), or only here (player).
+        /// Cue names as in Audio.sbc without "Arc"/"Real", e.g. "HudUnable", "SoundBlockAlert2". Loops belong in a sound block.
+        /// </summary>
+        /// <param name="entityId">Block (or any entity) id; the sound follows it.</param>
+        /// <param name="cue">Sound cue name.</param>
+        /// <param name="radius">Radius in metres (1 to 200).</param>
+        public void SoundPlay(long entityId, string cue, double radius = 30) { if (_soundPlay != null) _soundPlay(entityId, cue, radius); }
+
+        /// <summary>API 4 (1.3.0). Plays a short sound at a place, like <see cref="SoundPlay"/>.</summary>
+        /// <param name="position">Place in world coordinates.</param>
+        /// <param name="cue">Sound cue name.</param>
+        /// <param name="radius">Radius in metres (1 to 200).</param>
+        public void SoundPlayAt(VRageMath.Vector3D position, string cue, double radius = 30) { if (_soundPlayAt != null) _soundPlayAt(position, cue, radius); }
+
+        // ---------- helpers without endpoint (1.3.0) ----------
+
+        /// <summary>
+        /// 1.3.0. Server: <see cref="Notify"/> to every player whose character is within the radius of the place, each in
+        /// their own language. On a player: shown here if this player is within the radius.
+        /// </summary>
+        /// <param name="position">Place in world coordinates.</param>
+        /// <param name="radius">Radius in metres.</param>
+        /// <param name="textKey">Text key in MyTexts.</param>
+        /// <param name="fallback">Text when the key is missing.</param>
+        /// <param name="args">Format arguments; may be null.</param>
+        /// <param name="ms">Display time in milliseconds.</param>
+        /// <param name="font">Notification font.</param>
+        public void NotifyNear(VRageMath.Vector3D position, double radius, string textKey, string fallback, string[] args = null, int ms = 3000, string font = "White")
+        {
+            foreach (var player in PlayersNear(position, radius))
+            {
+                if (IsServer)
+                    Notify(player.SteamUserId, textKey, fallback, args, ms, font);
+                else if (player.SteamUserId == MyAPIGateway.Multiplayer.MyId)
+                    Notify(0, textKey, fallback, args, ms, font);
+            }
+        }
+
+        /// <summary>1.3.0. Players with a living character within the radius of the place (character centre).</summary>
+        /// <param name="position">Place in world coordinates.</param>
+        /// <param name="radius">Radius in metres.</param>
+        public static List<IMyPlayer> PlayersNear(VRageMath.Vector3D position, double radius)
+        {
+            var list = new List<IMyPlayer>();
+            MyAPIGateway.Players.GetPlayers(list, p => p.Character != null && !p.Character.IsDead
+                && VRageMath.Vector3D.DistanceSquared(p.Character.WorldAABB.Center, position) <= radius * radius);
+            return list;
+        }
+
+        /// <summary>
+        /// 1.3.0. Players with a living character inside a box, e.g. a doorway in block coordinates: build it with
+        /// <c>new MyOrientedBoundingBoxD(localBox, block.WorldMatrix)</c>. The character counts with its body radius.
+        /// </summary>
+        /// <param name="box">Box in world coordinates.</param>
+        /// <param name="bodyRadius">Added around the character centre (metres); 0 = only the centre.</param>
+        public static List<IMyPlayer> PlayersIn(VRageMath.MyOrientedBoundingBoxD box, double bodyRadius = 0.35)
+        {
+            var list = new List<IMyPlayer>();
+            MyAPIGateway.Players.GetPlayers(list, p =>
+            {
+                if (p.Character == null || p.Character.IsDead)
+                    return false;
+                var sphere = new VRageMath.BoundingSphereD(p.Character.WorldAABB.Center, bodyRadius);
+                return bodyRadius > 0 ? box.Intersects(ref sphere) : box.Contains(ref sphere.Center);
+            });
+            return list;
+        }
 
         // ---------- wiki (API 3) ----------
 
@@ -1206,8 +1307,12 @@ namespace Syntrix.Api
                 c.UpdateVisual();
         }
 
+        /// <summary>1.3.0. The block whose terminal was shown last (for lists whose entries depend on the block).</summary>
+        public static IMyTerminalBlock CurrentBlock { get; private set; }
+
         private static void ControlGetter(IMyTerminalBlock block, List<IMyTerminalControl> controls)
         {
+            CurrentBlock = block;
             if (InList)
             {
                 if (_listControlsFor != null && block is TBlock && _listControlsFor(block))
@@ -1677,6 +1782,62 @@ namespace Syntrix.Api
                     return 0;
                 };
                 c.Setter = (b, i) => { if (i >= 0 && i < items.Count) setter(b, items[(int)i].Item1); };
+                return c;
+            });
+        }
+
+        /// <summary>
+        /// 1.3.0. Drop-down list whose entries depend on the block (e.g. names found on the same grid). The entries are
+        /// asked again each time the list is shown; entries are (stored value, text or text key).
+        /// </summary>
+        /// <param name="id">Unique control id.</param>
+        /// <param name="titleKey">Text key of the title.</param>
+        /// <param name="tooltipKey">Text key of the tooltip; null = title.</param>
+        /// <param name="items">Entries of a block: stored value and text (or text key).</param>
+        /// <param name="getter">Current stored value of a block.</param>
+        /// <param name="setter">Stores a new value.</param>
+        /// <param name="visible">Visible check; null = always.</param>
+        /// <param name="enabled">Enabled check; null = always.</param>
+        public static void Combo(string id, string titleKey, string tooltipKey, Func<IMyTerminalBlock, IList<MyTuple<string, string>>> items,
+            Func<IMyTerminalBlock, string> getter, Action<IMyTerminalBlock, string> setter,
+            Func<IMyTerminalBlock, bool> visible = null, Func<IMyTerminalBlock, bool> enabled = null)
+        {
+            Func<IMyTerminalBlock, IList<MyTuple<string, string>>> entries = b =>
+            {
+                IList<MyTuple<string, string>> list = null;
+                if (b != null)
+                {
+                    try { list = items(b); }
+                    catch (Exception e) { MyLog.Default.WriteLineAndConsole("Syntrix controls: ERROR in combo entries of " + id + ": " + e); }
+                }
+                return list ?? new List<MyTuple<string, string>>();
+            };
+            AddControl(() =>
+            {
+                var c = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlCombobox, TBlock>(id);
+                Titles(c, titleKey, tooltipKey);
+                Common(c, visible, enabled);
+                c.ComboBoxContent = list =>
+                {
+                    var current = entries(CurrentBlock);
+                    for (int i = 0; i < current.Count; i++)
+                        list.Add(new MyTerminalControlComboBoxItem { Key = i, Value = MyStringId.GetOrCompute(current[i].Item2) });
+                };
+                c.Getter = b =>
+                {
+                    var current = entries(b);
+                    string v = getter(b);
+                    for (int i = 0; i < current.Count; i++)
+                        if (current[i].Item1 == v)
+                            return i;
+                    return 0;
+                };
+                c.Setter = (b, i) =>
+                {
+                    var current = entries(b);
+                    if (i >= 0 && i < current.Count)
+                        setter(b, current[(int)i].Item1);
+                };
                 return c;
             });
         }
