@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.1 (API version 5)
+
+No new endpoints; dock files stay valid.
+
+- F and K at blocks with the use object `SyntrixUse` stay closed for a player whose reputation with the block's
+  faction does not trade (goods level 0, see `RepDefineTiers` and `tradeFrom`). The player sees one notice
+  (`Syntrix_Rep_Refused`) instead. Members of the faction and blocks of factions without a reputation definition
+  are not affected. Mods with an F action need no code of their own for it.
+
 ## 1.4.0 (API version 5)
 
 Dock files of API versions 1 to 4 keep working; no endpoint was removed. Copy the new `Api/SyntrixApi.cs`

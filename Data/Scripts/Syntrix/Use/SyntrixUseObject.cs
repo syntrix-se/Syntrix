@@ -38,6 +38,8 @@ namespace Syntrix.Use
                 || MyAPIGateway.Session.Player.Character != character || character == null)
                 return;
             var block = Owner;
+            if (Refused(block as IMyCubeBlock))
+                return;
             if (action == UseActionEnum.Manipulate)
             {
                 var service = UseService.Instance;
@@ -48,6 +50,17 @@ namespace Syntrix.Use
             }
             else if (action == UseActionEnum.OpenTerminal)
                 MyAPIGateway.Gui.ShowTerminalPage(MyTerminalPageEnum.ControlPanel, character, block);
+        }
+
+        /// <summary>1.4.1: a faction that does not trade with the player keeps F and K closed and says why.</summary>
+        private static bool Refused(IMyCubeBlock block)
+        {
+            var core = SyntrixCore.Instance;
+            string name;
+            if (core == null || core.Rep == null || !core.Rep.Refuses(block, MyAPIGateway.Session.Player.IdentityId, out name))
+                return false;
+            core.Net.ShowLocal("Syntrix_Rep_Refused", "{0} refuses you access: your reputation is too low.", new[] { name }, 3000, "Red");
+            return true;
         }
 
         public override MyActionDescription GetActionInfo(UseActionEnum action)

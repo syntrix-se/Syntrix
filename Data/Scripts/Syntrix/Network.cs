@@ -105,6 +105,12 @@ namespace Syntrix
                 ToPlayer(p, steamId);
         }
 
+        /// <summary>Shows a notification on this machine only.</summary>
+        public void ShowLocal(string key, string fallback, string[] args, int ms, string font)
+        {
+            ShowNotify(key, fallback, args, ms, font);
+        }
+
         // ---------- sending ----------
 
         /// <summary>Sends a packet to the server (handled directly on the server itself).</summary>

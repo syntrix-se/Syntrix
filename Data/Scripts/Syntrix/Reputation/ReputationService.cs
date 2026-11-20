@@ -303,6 +303,25 @@ namespace Syntrix.Reputation
             return new MyTuple<int, int, float, int>(value, tier, percent, goods);
         }
 
+        /// <summary>
+        /// 1.4.1: true when the block belongs to a defined faction that does not trade with the player (goods level 0)
+        /// and the player is no member. Use objects of Syntrix (F and K) then stay closed for that player.
+        /// </summary>
+        public bool Refuses(IMyCubeBlock block, long identity, out string factionName)
+        {
+            factionName = null;
+            if (block == null || identity == 0 || block.OwnerId == 0)
+                return false;
+            var f = MyAPIGateway.Session?.Factions?.TryGetPlayerFaction(block.OwnerId);
+            if (f == null || f.IsMember(identity) || Def(f.Tag, false) == null)
+                return false;
+            var info = Info(identity, f.Tag);
+            if (info.Item1 == int.MinValue || info.Item4 != 0)
+                return false;
+            factionName = f.Name;
+            return true;
+        }
+
         /// <summary>Tier of a value, -1 when no tiers are defined.</summary>
         public int TierIndex(int value)
         {
