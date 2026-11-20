@@ -227,6 +227,14 @@ namespace SyntrixExample
                 if (door == null)
                     return;
                 _syx.Notify(0, "SyntrixExample_Changed", "Door {0}: watch {1}", new[] { door.CustomName, value });
+                // 1.3.0: watched doors blink blue, with a short sound for the players within 15 m
+                if (value == "1")
+                {
+                    _syx.LightsSet(entityId, null, new VRageMath.Color(80, 160, 255), 1f, 1f);
+                    _syx.SoundPlay(entityId, "HudClick", 15);
+                }
+                else
+                    _syx.LightsClear(entityId);
                 // To subscribers of this event on the server and on every player.
                 _syx.SendEventToAll(EventWatched, door.CustomName, value);
             });

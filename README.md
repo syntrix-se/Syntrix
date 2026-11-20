@@ -28,13 +28,15 @@ Copy the dock files into your mod's script folder and do not edit them:
 | Settings | a text file in the world storage: the server reads it (or writes the default), every player gets the same text, `SettingsSave` changes it for everybody |
 | Notifications | server sends a text key, every player sees it in their own language |
 | Registration queue | network channels, block change handlers, chat commands, event subscriptions and settings may be registered right after `Load`; the dock file keeps them and hands them over when Syntrix is ready |
-| Helpers in the dock file | `SyntrixFiles` (world and local storage, never throws), `SyntrixText` (text lookup with fallback), `SyntrixLog` (log with mod prefix, optional own log file) |
+| Helpers in the dock file | `SyntrixFiles` (world and local storage, never throws), `SyntrixText` (text lookup with fallback), `SyntrixLog` (log with mod prefix, optional own log file), `NotifyNear` (notification to the players near a place), `PlayersNear` and `PlayersIn` (players near a place or inside a box), drop-down lists whose entries depend on the block |
 | Windows (`SyntrixGui.cs`, players only) | windows in the Vanilla style through the game's own screen API (Esc, pause in single player, cursor, close button): panels and borders, stacks, scroll areas, text with wrapping, markup and links, buttons, images and icons (materials or definition ids), text fields, lists with icons and columns, trees, tables, check boxes, sliders, progress bars, tabs, drop-downs, tooltips, a confirmation window, a drawing area for special cases, and overlays on the screen without a window; grid size symbols of the G menu as materials `SyxGui_GridLarge` and `SyxGui_GridSmall` |
 | F action | a block gets its own F action (`UseRegister`) through the UseObjectsComponent `SyntrixUse` that Syntrix ships; without a registered action F opens the terminal; K still opens the Vanilla terminal |
 | Grid storage (server) | a grid group becomes a text (blueprint with block storage, relative to a frame, with its outline) and is spawned back after a space check, keeping the ids when they are free; plus the grid groups near a point (`GridsNearby`) |
 | Fixed screens (players) | a mod hands over lines for a block's screen; Syntrix draws them in one board style within 150 m, only on change, and takes the screen settings out of the K menu |
 | Admin only blocks | block types only admins see in the G menu; the server razes such blocks built by other players |
 | Price requests | one mod gives prices for a service name, others ask with a description and get an amount or "no price" |
+| Block lights | the server sets colour, brightness and blinking of a block's status lights (emissive parts); Syntrix sends it to every player, also to later ones, and paints it again when the game repaints the block |
+| Short sounds | the server plays a short sound at a block or a place for the players within a radius |
 | Wiki | in-game wiki (F11, `/syxwiki`): every loaded mod adds pages with a `Data/Syntrix-Wiki.xml`, no code needed; mods with code add generated pages (`WikiAddSource`) and fill automatic tables (`WikiAddTables`) |
 
 ## Quick start
@@ -134,6 +136,11 @@ _syx.AdminBlockRegister("FunctionalBlock/MyNpcTerminal", "MyMod_AdminOnly", "Onl
 long price = _syx.PriceAsk("MyMod.Repair", SyntrixApi.PriceLine("blocks", "12"));
 if (price < 0)
     price = 12 * 100;
+
+// server: the status lights of a door blink yellow, then a short sound for everyone within 15 m
+_syx.LightsSet(door.EntityId, null, Color.Yellow, 1f, 0.8f);
+_syx.SoundPlay(door.EntityId, "HudUnable", 15);
+_syx.LightsClear(door.EntityId);   // back to the game's own colours
 ```
 
 ### Rich HUD

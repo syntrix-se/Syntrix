@@ -17,8 +17,12 @@ namespace Syntrix
             try
             {
                 core.AdminBlocks.Tick();
+                core.Lights.Tick();
                 if (core.IsPlayer)
+                {
                     core.Screens.Tick();
+                    core.Sounds.Tick();
+                }
             }
             catch (Exception e)
             {
