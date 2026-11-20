@@ -690,7 +690,7 @@ namespace Syntrix.Api
         // ---------- price requests (API 4) ----------
 
         /// <summary>
-        /// API 4. Registers this mod as price giver of a service (e.g. "Hangar.Store"). The giver gets the service name
+        /// API 4. Registers this mod as price giver of a service (e.g. "Npc.Repair"). The giver gets the service name
         /// and the description (lines "key=value", see <see cref="PriceLine"/>) and returns the price, or -1 for
         /// "no price". Null removes it. Register where prices are asked (usually the server); may be called before ready.
         /// </summary>
@@ -986,7 +986,7 @@ namespace Syntrix.Api
         public const string PriceChangedEvent = "Syntrix.Price.Changed";
 
         /// <summary>API 6. A price giver tells the askers that its prices of a service changed (raised where it is called).</summary>
-        /// <param name="service">Service name, e.g. "Hangar.Store".</param>
+        /// <param name="service">Service name, e.g. "Npc.Repair".</param>
         public void PriceChanged(string service) { if (_priceChanged != null) _priceChanged(service); }
 
         // ---------- world clock (API 6, Syntrix 1.5.0) ----------
