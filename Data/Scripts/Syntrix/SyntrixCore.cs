@@ -12,6 +12,7 @@ using Syntrix.Effects;
 using Syntrix.Grids;
 using Syntrix.Gui;
 using Syntrix.Price;
+using Syntrix.Reputation;
 using Syntrix.Screens;
 using Syntrix.Use;
 using Syntrix.Wiki;
@@ -71,6 +72,8 @@ namespace Syntrix
         public LightService Lights;
         /// <summary>Short sounds at a block or a place (API 4, 1.3.0).</summary>
         public SoundService Sounds;
+        /// <summary>Reputation of players with factions (API 5, 1.4.0).</summary>
+        public ReputationService Rep;
 
         private readonly Dictionary<string, int> _docked = new Dictionary<string, int>();
         private string _instanceKey;
@@ -114,16 +117,26 @@ namespace Syntrix
             Prices = new PriceService();
             Lights = new LightService(this);
             Sounds = new SoundService(this);
+            Rep = new ReputationService(this);
             Net.Start();
             Blocks.Start();
             Chat.Start();
             Settings.Start();
             Wiki.Start();
             Lights.Start();
+            Rep.Start();
+            Chat.Register("Syntrix", "syxrep", (int)MyPromoteLevel.Admin, true, "reputation of players (/syxrep list|set|add|reset)", Rep.OnChat);
             Started = true;
 
             Log.Info("Syntrix " + Protocol.VersionText + " (API " + Protocol.ApiVersion + ") started, " + (IsServer ? "server" : "client") + (IsPlayer ? " with player" : ""));
             MyAPIGateway.Utilities.SendModMessage(Protocol.ApiChannel, new MyTuple<string, int>(Protocol.TagHello, Protocol.ApiVersion));
+        }
+
+        /// <summary>Saves what the services keep with the world.</summary>
+        public override void SaveData()
+        {
+            if (Started)
+                Rep.Save();
         }
 
         /// <summary>Stops the services.</summary>
@@ -139,6 +152,7 @@ namespace Syntrix
                 Prices.Stop();
                 Lights.Stop();
                 Sounds.Stop();
+                Rep.Stop();
                 Watch.Stop();
                 Gui.Stop();
                 Use.Stop();
@@ -348,6 +362,26 @@ namespace Syntrix
             d["Lights.Clear"] = new Action<long, string>(Lights.Clear);
             d["Sound.Play"] = new Action<long, string, double>(Sounds.Play);
             d["Sound.PlayAt"] = new Action<Vector3D, string, double>(Sounds.PlayAt);
+
+            // API 5 (1.4.0): reputation of players with factions
+            d["Rep.DefineScale"] = new Action<int, int>((min, max) => Rep.DefineScale(modName, min, max));
+            d["Rep.DefineTiers"] = new Action<List<MyTuple<string, int, float, int>>>(tiers => Rep.DefineTiers(modName, tiers));
+            d["Rep.DefineFaction"] = new Action<string, int, int, int, int>((tag, start, min, max, tradeFrom) => Rep.DefineFaction(modName, tag, start, min, max, tradeFrom));
+            d["Rep.DefineRecovery"] = new Action<string, int, int>((tag, perHour, upTo) => Rep.DefineRecovery(modName, tag, perHour, upTo));
+            d["Rep.DefineLink"] = new Action<string, string, float>((from, to, factor) => Rep.DefineLink(modName, from, to, factor));
+            d["Rep.ClearDefinitions"] = new Action(() => Rep.ClearDefinitions(modName));
+            d["Rep.SetBetween"] = new Action<string, string, int>(Rep.SetBetween);
+            d["Rep.Get"] = new Func<long, string, int>(Rep.Get);
+            d["Rep.Info"] = new Func<long, string, MyTuple<int, int, float, int>>(Rep.Info);
+            d["Rep.TierOf"] = new Func<int, int>(Rep.TierIndex);
+            d["Rep.TierCount"] = new Func<int>(() => Rep.TierCount);
+            d["Rep.Tier"] = new Func<int, MyTuple<string, int, int, float, int>>(Rep.TierAt);
+            d["Rep.Scale"] = new Func<MyTuple<int, int>>(() => Rep.Scale);
+            d["Rep.Limits"] = new Func<string, MyTuple<int, int>>(Rep.Limits);
+            d["Rep.Factions"] = new Func<string[]>(Rep.Factions);
+            d["Rep.Change"] = new Func<long, string, int, string, int, int>(Rep.Change);
+            d["Rep.Set"] = new Action<long, string, int, string>(Rep.Set);
+            d["Rep.ResetStart"] = new Action<long>(Rep.ResetStart);
 
             // Wiki (API 3)
             d["Wiki.Open"] = new Func<string, bool>(Wiki.Open);

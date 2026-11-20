@@ -186,9 +186,10 @@ namespace Syntrix
         private void Handle(Packet p, ulong sender, bool fromServer)
         {
             bool toServer = p.Kind == PacketKind.BlockSet || p.Kind == PacketKind.BlockSyncRequest || p.Kind == PacketKind.ChatRun
-                || p.Kind == PacketKind.SettingsRequest || p.Kind == PacketKind.LightsRequest;
+                || p.Kind == PacketKind.SettingsRequest || p.Kind == PacketKind.LightsRequest || p.Kind == PacketKind.ReputationRequest;
             bool toPlayer = p.Kind == PacketKind.BlockValues || p.Kind == PacketKind.ChatReply || p.Kind == PacketKind.Notify
-                || p.Kind == PacketKind.SettingsValue || p.Kind == PacketKind.Lights || p.Kind == PacketKind.Sound;
+                || p.Kind == PacketKind.SettingsValue || p.Kind == PacketKind.Lights || p.Kind == PacketKind.Sound
+                || p.Kind == PacketKind.Reputation;
 
             if (toServer && !_core.IsServer)
                 return;
@@ -227,6 +228,10 @@ namespace Syntrix
                 case PacketKind.Lights:
                 case PacketKind.LightsRequest:
                     _core.Lights.OnPacket(p, sender);
+                    break;
+                case PacketKind.Reputation:
+                case PacketKind.ReputationRequest:
+                    _core.Rep.OnPacket(p, sender);
                     break;
                 case PacketKind.Sound:
                     _core.Sounds.OnPacket(p);

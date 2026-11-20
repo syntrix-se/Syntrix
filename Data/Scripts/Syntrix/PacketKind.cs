@@ -38,5 +38,12 @@ namespace Syntrix
         LightsRequest = 12,
         /// <summary>A short sound at a block or a place.</summary>
         Sound = 13,
+
+        // API 5 (Syntrix 1.4.0)
+
+        /// <summary>Reputation from the server (definitions, values, faction pairs).</summary>
+        Reputation = 14,
+        /// <summary>A player asks for the reputation definitions and its values.</summary>
+        ReputationRequest = 15,
     }
 }

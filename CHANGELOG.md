@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.4.0 (API version 5)
+
+Dock files of API versions 1 to 4 keep working; no endpoint was removed. Copy the new `Api/SyntrixApi.cs`
+to use the reputation service.
+
+### Reputation of players with factions
+
+- One mod (the faction mod) defines on the server the scale, the tiers (text key, lowest value, trade
+  percent, goods level) and per faction the start value, the lowest and highest value, the lowest tier
+  that trades, a slow recovery while online and links to other factions. Players get the definitions from
+  the server, also when they join later.
+- The start value is given once per player and faction; only these marks are saved (world storage,
+  `Syntrix-Reputation-Start.txt`). The values themselves stay in the game.
+- Every value stays inside its faction's limits, also when the game or another mod changes it (checked
+  in the next frame, because the game reports a change before it stores it).
+- A change with the propagate flag passes a share on to linked factions (one step, inside their limits).
+- Every value is sent to the player's machine, so `RepGet` and `RepInfo` work there too (the game does
+  not send values set by scripts). Faction to faction values (`RepSetBetween`) go to every player.
+- The player sees the amount of a change (summed up over two seconds) and every tier change, in their own
+  language (`Syntrix_Rep_Change`, `Syntrix_Rep_TierUp`, `Syntrix_Rep_TierDown`).
+- Event `Syntrix.Rep.Changed` (identity, tag, old, new, reason) on the server and on the player's machine.
+- Admin chat command `/syxrep list|set|add|reset`.
+- Endpoints `Rep.DefineScale`, `Rep.DefineTiers`, `Rep.DefineFaction`, `Rep.DefineRecovery`,
+  `Rep.DefineLink`, `Rep.ClearDefinitions`, `Rep.SetBetween`, `Rep.Get`, `Rep.Info`, `Rep.TierOf`,
+  `Rep.TierCount`, `Rep.Tier`, `Rep.Scale`, `Rep.Limits`, `Rep.Factions`, `Rep.Change`, `Rep.Set`,
+  `Rep.ResetStart`; in the dock file the methods `Rep*`, `RepOnChanged` and the constants
+  `RepChangedEvent`, `RepPropagate`, `RepQuiet`.
+
 ## 1.3.0 (API version 4)
 
 Dock files of API versions 1 to 3 keep working; no endpoint was removed. Copy the new `Api/SyntrixApi.cs`
