@@ -28,6 +28,11 @@ to use accounts, the reputation gate and price, and the world clock.
 - `Price.Changed` raises `Syntrix.Price.Changed` (service name) when a price giver changes its prices.
   Dock file: `PriceChanged`, constant `PriceChangedEvent`.
 
+### Fixed screens
+
+- The screen settings leave the K menu only at blocks whose content function returns a text; other blocks of the
+  same type (a player's store next to an NPC store, for example) keep them.
+
 ### World clock
 
 - One world clock for all mods: start date, time factor, year length and planet calendars in the world

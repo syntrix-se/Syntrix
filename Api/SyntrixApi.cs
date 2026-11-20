@@ -643,8 +643,8 @@ namespace Syntrix.Api
 
         /// <summary>
         /// API 4. Content of a fixed screen of a block type. Syntrix calls the function about every 100 frames for each
-        /// such block within 150 m and draws only when the text changed; the screen settings of the block leave the
-        /// K menu. Build the text with <see cref="ScreenLine"/> and <see cref="ScreenTitle"/>; null or "" leaves the
+        /// such block within 150 m and draws only when the text changed; the screen settings leave the K menu of the
+        /// blocks with a text (API 6; before, of all blocks of the type). Build the text with <see cref="ScreenLine"/> and <see cref="ScreenTitle"/>; null or "" leaves the
         /// screen as it is. A null function removes the registration. Players only, may be called before ready.
         /// </summary>
         /// <param name="blockKey">"TypeId/SubtypeId" without "MyObjectBuilder_".</param>
