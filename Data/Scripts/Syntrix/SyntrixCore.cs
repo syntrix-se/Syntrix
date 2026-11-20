@@ -7,7 +7,11 @@ using VRage;
 using VRage.Game;
 using VRage.Game.Components;
 using VRage.Game.ModAPI;
+using Syntrix.Blocks;
+using Syntrix.Grids;
 using Syntrix.Gui;
+using Syntrix.Price;
+using Syntrix.Screens;
 using Syntrix.Use;
 using Syntrix.Wiki;
 using VRage.Utils;
@@ -52,6 +56,17 @@ namespace Syntrix
         /// <summary>In-game wiki (API 3).</summary>
         public WikiService Wiki;
 
+        /// <summary>Block watcher for the services of API 4.</summary>
+        public BlockWatch Watch;
+        /// <summary>Grid storage (API 4).</summary>
+        public GridStore Grids;
+        /// <summary>Fixed screens (API 4).</summary>
+        public ScreenService Screens;
+        /// <summary>Admin only blocks (API 4).</summary>
+        public AdminBlocks AdminBlocks;
+        /// <summary>Price requests (API 4).</summary>
+        public PriceService Prices;
+
         private readonly Dictionary<string, int> _docked = new Dictionary<string, int>();
         private string _instanceKey;
 
@@ -87,6 +102,11 @@ namespace Syntrix
             Gui = new GuiService(this);
             Use = new UseService();
             Wiki = new WikiService(this);
+            Watch = new BlockWatch();
+            Grids = new GridStore(this);
+            Screens = new ScreenService(this, Watch);
+            AdminBlocks = new AdminBlocks(this, Watch);
+            Prices = new PriceService();
             Net.Start();
             Blocks.Start();
             Chat.Start();
@@ -106,6 +126,10 @@ namespace Syntrix
             {
                 MyAPIGateway.Utilities.SendModMessage(Protocol.ApiChannel, new MyTuple<string, int>(Protocol.TagBye, Protocol.ApiVersion));
                 Wiki.Stop();
+                Screens.Stop();
+                AdminBlocks.Stop();
+                Prices.Stop();
+                Watch.Stop();
                 Gui.Stop();
                 Use.Stop();
                 Settings.Stop();
@@ -289,6 +313,25 @@ namespace Syntrix
             // API 3: own F action for blocks (UseObjectTypeOverride "syntrix")
             d["Use.Register"] = new Action<string, string, Action<long, int>>((block, hint, h) => Use.Register(modName, block, hint, h));
             d["Use.Unregister"] = new Action<string>(block => Use.Unregister(modName, block));
+
+            // API 4: grid storage (server only)
+            d["Grids.Nearby"] = new Func<Vector3D, double, long, long[]>(Grids.Nearby);
+            d["Grids.Capture"] = new Func<long, MatrixD, string>(Grids.Capture);
+            d["Grids.Spawn"] = new Func<string, MatrixD, long, int>(Grids.Spawn);
+            d["Grids.Fits"] = new Func<string, MatrixD, long, bool>(Grids.Fits);
+
+            // API 4: fixed screens (players only)
+            d["Screen.Register"] = new Action<string, int, Func<long, string>>((block, surface, content) => Screens.Register(modName, block, surface, content));
+            d["Screen.Refresh"] = new Action<long>(Screens.Refresh);
+
+            // API 4: admin only blocks (all machines)
+            d["Admin.RegisterBlock"] = new Action<string, string, string>((block, key, fallback) => AdminBlocks.Register(modName, block, key, fallback));
+            d["Admin.UnregisterBlock"] = new Action<string>(block => AdminBlocks.Unregister(modName, block));
+
+            // API 4: price requests
+            d["Price.Register"] = new Action<string, Func<string, string, long>>((service, giver) => Prices.Register(modName, service, giver));
+            d["Price.Has"] = new Func<string, bool>(Prices.Has);
+            d["Price.Ask"] = new Func<string, string, long>((service, description) => Prices.Ask(modName, service, description));
 
             // Wiki (API 3)
             d["Wiki.Open"] = new Func<string, bool>(Wiki.Open);

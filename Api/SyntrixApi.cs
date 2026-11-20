@@ -1,4 +1,4 @@
-// Syntrix dock file (API version 3, Syntrix 1.2.0). Copy this file into your mod's script folder.
+// Syntrix dock file (API version 4, Syntrix 1.3.0). Copy this file into your mod's script folder.
 // Do not edit it; take a newer copy from the Syntrix repository instead.
 // Windows and screen elements: also copy SyntrixGui.cs (optional dock file of the window service).
 //
@@ -38,7 +38,7 @@ namespace Syntrix.Api
         public const long Channel = 8346120579001L;
 
         /// <summary>API version of this dock file.</summary>
-        public const int ApiVersion = 3;
+        public const int ApiVersion = 4;
 
         /// <summary>Prefix for notification arguments that are text keys themselves.</summary>
         public const char TextArgPrefix = '\u0001';
@@ -232,6 +232,18 @@ namespace Syntrix.Api
         private Func<string, bool, string[]> _wikiPlanet;
         private Func<string, bool, string> _wikiTitle;
         private Func<string, string, bool, string> _wikiText;
+        // API 4
+        private Func<VRageMath.Vector3D, double, long, long[]> _gridsNearby;
+        private Func<long, VRageMath.MatrixD, string> _gridsCapture;
+        private Func<string, VRageMath.MatrixD, long, int> _gridsSpawn;
+        private Func<string, VRageMath.MatrixD, long, bool> _gridsFits;
+        private Action<string, int, Func<long, string>> _screenRegister;
+        private Action<long> _screenRefresh;
+        private Action<string, string, string> _adminRegister;
+        private Action<string> _adminUnregister;
+        private Action<string, Func<string, string, long>> _priceRegister;
+        private Func<string, bool> _priceHas;
+        private Func<string, string, long> _priceAsk;
 
         private void Bind()
         {
@@ -273,6 +285,17 @@ namespace Syntrix.Api
             _wikiPlanet = Get<Func<string, bool, string[]>>("Wiki.Planet");
             _wikiTitle = Get<Func<string, bool, string>>("Wiki.Title");
             _wikiText = Get<Func<string, string, bool, string>>("Wiki.Text");
+            _gridsNearby = Get<Func<VRageMath.Vector3D, double, long, long[]>>("Grids.Nearby");
+            _gridsCapture = Get<Func<long, VRageMath.MatrixD, string>>("Grids.Capture");
+            _gridsSpawn = Get<Func<string, VRageMath.MatrixD, long, int>>("Grids.Spawn");
+            _gridsFits = Get<Func<string, VRageMath.MatrixD, long, bool>>("Grids.Fits");
+            _screenRegister = Get<Action<string, int, Func<long, string>>>("Screen.Register");
+            _screenRefresh = Get<Action<long>>("Screen.Refresh");
+            _adminRegister = Get<Action<string, string, string>>("Admin.RegisterBlock");
+            _adminUnregister = Get<Action<string>>("Admin.UnregisterBlock");
+            _priceRegister = Get<Action<string, Func<string, string, long>>>("Price.Register");
+            _priceHas = Get<Func<string, bool>>("Price.Has");
+            _priceAsk = Get<Func<string, string, long>>("Price.Ask");
         }
 
         // ---------- info ----------
@@ -480,6 +503,137 @@ namespace Syntrix.Api
         /// <summary>API 3. Removes the F action of a block type (only the mod that registered it).</summary>
         /// <param name="blockKey">"TypeId/SubtypeId" as given to <see cref="UseRegister"/>.</param>
         public void UseUnregister(string blockKey) { if (_useUnregister != null) _useUnregister(blockKey); }
+
+        // ---------- grid storage (API 4, server only) ----------
+
+        /// <summary>API 4. Result of <see cref="GridsSpawn"/>: spawned, all entity ids kept.</summary>
+        public const int GridSpawnedKeptIds = 0;
+        /// <summary>API 4. Result of <see cref="GridsSpawn"/>: spawned with new entity ids (an id was taken).</summary>
+        public const int GridSpawnedNewIds = 1;
+        /// <summary>API 4. Result of <see cref="GridsSpawn"/>: the text is no grid text.</summary>
+        public const int GridInvalid = -1;
+        /// <summary>API 4. Result of <see cref="GridsSpawn"/>: the place is blocked by a grid or a character.</summary>
+        public const int GridBlocked = -2;
+        /// <summary>API 4. Result of <see cref="GridsSpawn"/>: not on the server.</summary>
+        public const int GridNotServer = -3;
+        /// <summary>API 4. Result of <see cref="GridsSpawn"/>: no framework.</summary>
+        public const int GridNoFramework = -4;
+
+        /// <summary>
+        /// API 4. Grid groups (mechanical) whose centre lies within the radius, as the entity id of their main grid (most
+        /// blocks). Groups with a static grid, grids without physics and the group of <paramref name="exceptGrid"/>
+        /// (e.g. the station itself) are left out. Empty without the framework.
+        /// </summary>
+        /// <param name="centre">Centre in world coordinates.</param>
+        /// <param name="radius">Radius in metres.</param>
+        /// <param name="exceptGrid">A grid whose group is left out, 0 = none.</param>
+        public long[] GridsNearby(VRageMath.Vector3D centre, double radius, long exceptGrid)
+        {
+            return _gridsNearby != null ? _gridsNearby(centre, radius, exceptGrid) : new long[0];
+        }
+
+        /// <summary>
+        /// API 4, server. The grid group of a grid as text (blueprint with the block storage, relative to the frame, plus
+        /// the outline). The grids stay in the world: save the text first (e.g. <see cref="SyntrixFiles"/>), then close
+        /// the grids. Null if the grid does not exist.
+        /// </summary>
+        /// <param name="gridId">Any grid of the group.</param>
+        /// <param name="frame">Reference frame, e.g. the world matrix of a connector.</param>
+        public string GridsCapture(long gridId, VRageMath.MatrixD frame) { return _gridsCapture != null ? _gridsCapture(gridId, frame) : null; }
+
+        /// <summary>
+        /// API 4, server. Spawns a text of <see cref="GridsCapture"/> relative to the frame after a space check.
+        /// Keeps the entity ids when all are free, otherwise all get new ones. Returns one of the Grid* constants.
+        /// </summary>
+        /// <param name="text">Grid text.</param>
+        /// <param name="frame">Reference frame.</param>
+        /// <param name="exceptGrid">A grid whose group does not count as obstacle, 0 = none.</param>
+        public int GridsSpawn(string text, VRageMath.MatrixD frame, long exceptGrid) { return _gridsSpawn != null ? _gridsSpawn(text, frame, exceptGrid) : GridNoFramework; }
+
+        /// <summary>API 4, server. True if the place of the grid text at the frame is free.</summary>
+        /// <param name="text">Grid text.</param>
+        /// <param name="frame">Reference frame.</param>
+        /// <param name="exceptGrid">A grid whose group does not count as obstacle, 0 = none.</param>
+        public bool GridsFits(string text, VRageMath.MatrixD frame, long exceptGrid) { return _gridsFits != null && _gridsFits(text, frame, exceptGrid); }
+
+        // ---------- fixed screens (API 4, players only) ----------
+
+        /// <summary>
+        /// API 4. Content of a fixed screen of a block type. Syntrix calls the function about every 100 frames for each
+        /// such block within 150 m and draws only when the text changed; the screen settings of the block leave the
+        /// K menu. Build the text with <see cref="ScreenLine"/> and <see cref="ScreenTitle"/>; null or "" leaves the
+        /// screen as it is. A null function removes the registration. Players only, may be called before ready.
+        /// </summary>
+        /// <param name="blockKey">"TypeId/SubtypeId" without "MyObjectBuilder_".</param>
+        /// <param name="surface">Screen index of the block (0 = first).</param>
+        /// <param name="content">Block entity id in, screen text out.</param>
+        public void ScreenRegister(string blockKey, int surface, Func<long, string> content) { WhenReady(() => { if (_screenRegister != null) _screenRegister(blockKey, surface, content); }); }
+
+        /// <summary>API 4. Draws the screens of a block again at the next pass.</summary>
+        /// <param name="entityId">Block entity id.</param>
+        public void ScreenRefresh(long entityId) { if (_screenRefresh != null) _screenRefresh(entityId); }
+
+        /// <summary>
+        /// API 4. One line of a fixed screen. Kinds: 'A' alarm bar, 'N' name, 'S' small, 'V' value, 'H' hint (bullet),
+        /// 'F' foot (bottom line), 'G' gap. "{F}" in the text becomes the key of the use control.
+        /// </summary>
+        /// <param name="kind">Kind of the line.</param>
+        /// <param name="text">Text (tabs and line breaks become spaces).</param>
+        public static string ScreenLine(char kind, string text) { return kind + "\t" + Clean(text) + "\n"; }
+
+        /// <summary>API 4. The title line of a fixed screen with an optional symbol (LCD texture subtype, null = none).</summary>
+        /// <param name="symbol">LCD texture subtype or null.</param>
+        /// <param name="text">Title.</param>
+        public static string ScreenTitle(string symbol, string text) { return "T\t" + Clean(symbol) + "\t" + Clean(text) + "\n"; }
+
+        private static string Clean(string text) { return (text ?? "").Replace('\t', ' ').Replace('\n', ' ').Replace("\r", ""); }
+
+        // ---------- admin only blocks (API 4) ----------
+
+        /// <summary>
+        /// API 4. A block type for admins only: in the G menu only while the local player is admin, and the server razes
+        /// such a block again when a player without admin rank starts to build it or welds it from a projection (blocks
+        /// placed finished, of NPCs or in prefabs stay). Call it on every machine; may be called before ready.
+        /// </summary>
+        /// <param name="blockKey">"TypeId/SubtypeId" without "MyObjectBuilder_".</param>
+        /// <param name="noticeKey">Text key of the notice for that player, null = Syntrix default.</param>
+        /// <param name="fallback">Text if the key is missing.</param>
+        public void AdminBlockRegister(string blockKey, string noticeKey, string fallback) { WhenReady(() => { if (_adminRegister != null) _adminRegister(blockKey, noticeKey, fallback); }); }
+
+        /// <summary>API 4. Removes the admin rule of a block type (only the mod that registered it).</summary>
+        /// <param name="blockKey">"TypeId/SubtypeId".</param>
+        public void AdminBlockUnregister(string blockKey) { if (_adminUnregister != null) _adminUnregister(blockKey); }
+
+        // ---------- price requests (API 4) ----------
+
+        /// <summary>
+        /// API 4. Registers this mod as price giver of a service (e.g. "Hangar.Store"). The giver gets the service name
+        /// and the description (lines "key=value", see <see cref="PriceLine"/>) and returns the price, or -1 for
+        /// "no price". Null removes it. Register where prices are asked (usually the server); may be called before ready.
+        /// </summary>
+        /// <param name="service">Service name.</param>
+        /// <param name="giver">(service, description) → price or -1.</param>
+        public void PriceRegister(string service, Func<string, string, long> giver) { WhenReady(() => { if (_priceRegister != null) _priceRegister(service, giver); }); }
+
+        /// <summary>API 4. True if a price giver is registered for the service.</summary>
+        /// <param name="service">Service name.</param>
+        public bool PriceHas(string service) { return _priceHas != null && _priceHas(service); }
+
+        /// <summary>
+        /// API 4. Price of a service from its price giver; -1 if there is none, it has no price or the framework is
+        /// missing. Then use your own price.
+        /// </summary>
+        /// <param name="service">Service name.</param>
+        /// <param name="description">Lines "key=value", built with <see cref="PriceLine"/>.</param>
+        public long PriceAsk(string service, string description) { return _priceAsk != null ? _priceAsk(service, description) : -1; }
+
+        /// <summary>
+        /// API 4. One line "key=value" of a price description. Common keys: station (entity id), faction (tag), player
+        /// (identity id), blocks (count), "item:TypeId/SubtypeId" (amount), "block:TypeId/SubtypeId" (count).
+        /// </summary>
+        /// <param name="key">Key.</param>
+        /// <param name="value">Value.</param>
+        public static string PriceLine(string key, string value) { return Clean(key).Replace("=", "") + "=" + Clean(value) + "\n"; }
 
         // ---------- wiki (API 3) ----------
 

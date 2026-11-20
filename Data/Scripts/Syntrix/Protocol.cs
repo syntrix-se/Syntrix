@@ -13,13 +13,13 @@ namespace Syntrix
         public const ushort NetChannel = 52741;
 
         /// <summary>API version this framework build offers.</summary>
-        public const int ApiVersion = 3;
+        public const int ApiVersion = 4;
 
         /// <summary>Oldest dock file version this build still accepts.</summary>
         public const int MinApiVersion = 1;
 
         /// <summary>Human readable version (semantic versioning).</summary>
-        public const string VersionText = "1.2.2";
+        public const string VersionText = "1.3.0";
 
         /// <summary>Message tag: a mod asks to dock.</summary>
         public const string TagRegister = "syx.register";
