@@ -48,6 +48,16 @@ to use accounts, the reputation gate and price, and the world clock.
   `Syx.Night`, `Syx.SunHeight`, `Syx.WorldTime`, `Syx.WorldYear`, `Syx.WorldDay`, `Syx.WorldHour`,
   `Syx.Calendar`; AutoLCD commands `WorldTime` and `LocalTime`; chat command `/syxtime`.
 
+### AutoLCD
+
+- Syntrix AutoLCD is now part of Syntrix: text screens filled without a programmable block, operated like
+  Automatic LCDs 2 by MMaster (independent implementation, no code of it). Runs on the server, within a time
+  budget per tick; actions `SyxAutoLcd.ScrollUp`, `ScrollDown`, `Clear`, `Boot`; chat `/syxlcd`.
+- Other mods add commands as before through the events `SyxAutoLcd.RegisterCommand` and
+  `SyxAutoLcd.RegisterCommandTimed`; AutoLCD raises `SyxAutoLcd.Ready` when it starts. No dock file change.
+- Settings in the world storage of Syntrix (`Syntrix-AutoLcd.xml`, written with defaults by the server). Screen
+  texts come from `MyTexts_AutoLcd*.resx` of any loaded mod, with English fallbacks in the code.
+
 ## 1.4.1 (API version 5)
 
 No new endpoints; dock files stay valid.

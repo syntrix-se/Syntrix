@@ -41,6 +41,7 @@ Copy the dock files into your mod's script folder and do not edit them:
 | Accounts (API 6) | player and faction money with one check per frame, `Syntrix.Account.Changed` for every change |
 | Reputation gate and price (API 6) | lowest goods level per block type or block (also Vanilla blocks such as stores), price after the player's trade percent |
 | World clock (API 6) | one world date and local time of day for all mods, settings in the world storage, planet calendars, event controller events, script properties, AutoLCD commands, `/syxtime` |
+| AutoLCD (1.5.0) | text screens filled without a programmable block, operated like Automatic LCDs 2 (inventory, cargo, power, blocks, gas, ship, text, time, reputation); mods add own commands through an event; settings in the world storage, `/syxlcd` |
 | Wiki | in-game wiki (F11, `/syxwiki`): every loaded mod adds pages with a `Data/Syntrix-Wiki.xml`, no code needed; mods with code add generated pages (`WikiAddSource`) and fill automatic tables (`WikiAddTables`) |
 
 ## Quick start
@@ -184,6 +185,20 @@ string date = _syx.TimeWorldText();
 string local = _syx.TimeLocalText(position);
 _syx.Subscribe(SyntrixApi.TimeNewDayEvent, payload => OnNewDay());
 ```
+
+### AutoLCD commands (1.5.0)
+
+A mod adds a command for screens with `[LCD]` in their name (server; again when AutoLCD reports ready):
+
+```csharp
+Func<IMyTerminalBlock, string[], List<MyTuple<string, string, float>>> lines = (screen, args) =>
+    new List<MyTuple<string, string, float>> { new MyTuple<string, string, float>("Stock", "42", 0.42f) };
+_syx.Publish("SyxAutoLcd.RegisterCommand", new MyTuple<string, Func<IMyTerminalBlock, string[], List<MyTuple<string, string, float>>>>("MyStock", lines));
+_syx.Subscribe("SyxAutoLcd.Ready", payload => { /* publish again */ });
+```
+
+Each line is label, value and bar fill 0 to 1 (negative: no bar); `SyxAutoLcd.RegisterCommandTimed` takes the seconds
+between two runs as a middle value. Details: `Data/Scripts/Syntrix/AutoLcd/README.md`.
 
 ### Rich HUD
 
