@@ -752,11 +752,16 @@ namespace Syntrix.Reputation
         public string OnChat(ulong sender, string[] args)
         {
             string cmd = args.Length > 0 ? args[0].ToLowerInvariant() : "list";
-            IMyPlayer target = args.Length > 1 ? FindByName(args[1]) : _core.FindPlayer(sender);
+            // "set <TAG> <value>" / "add <TAG> <amount>" without a player: the sender himself
+            if ((cmd == "set" || cmd == "add") && args.Length == 3 && MyAPIGateway.Session.Factions.TryGetFactionByTag(args[1]) != null)
+                args = new[] { args[0], "", args[1], args[2] };
+            IMyPlayer target = args.Length > 1 && args[1].Length == 0 ? _core.FindPlayer(sender) : null;
+            if (target == null)
+                target = args.Length > 1 ? FindByName(args[1]) : _core.FindPlayer(sender);
             if (target == null && (cmd != "list" || args.Length > 1))
                 return "Player not found.";
             if (target == null)
-                return "Usage: /syxrep list [player] | set <player> <TAG> <value> | add <player> <TAG> <amount> | reset <player>";
+                return "Usage: /syxrep list [player] | set [player] <TAG> <value> | add [player] <TAG> <amount> | reset <player>";
             switch (cmd)
             {
                 case "list":
@@ -774,7 +779,7 @@ namespace Syntrix.Reputation
                 case "set":
                 case "add":
                     if (args.Length < 4 || MyAPIGateway.Session.Factions.TryGetFactionByTag(args[2]) == null)
-                        return "Usage: /syxrep " + cmd + " <player> <TAG> <number>";
+                        return "Usage: /syxrep " + cmd + " [player] <TAG> <number>";
                     int n = ToInt(args[3], int.MinValue);
                     if (n == int.MinValue)
                         return "Not a number: " + args[3];
@@ -787,7 +792,7 @@ namespace Syntrix.Reputation
                     ResetStart(target.IdentityId);
                     return target.DisplayName + ": start values given again.";
             }
-            return "Usage: /syxrep list [player] | set <player> <TAG> <value> | add <player> <TAG> <amount> | reset <player>";
+            return "Usage: /syxrep list [player] | set [player] <TAG> <value> | add [player] <TAG> <amount> | reset <player>";
         }
 
         private IMyPlayer FindByName(string name)
