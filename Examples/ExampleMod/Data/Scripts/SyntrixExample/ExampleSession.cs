@@ -243,9 +243,26 @@ namespace SyntrixExample
             _syx.RepOnChanged((identity, tag, old, now, reason) =>
                 _log.Info("reputation " + identity + " " + tag + ": " + old + " -> " + now + " (" + reason + ")"));
 
+            // API 6: world clock and local time (all machines).
+            _log.Info("world time " + _syx.TimeWorldText() + ", world day " + _syx.TimeWorldDays.ToString("0.00"));
+
+            // API 6: on the server, a vanilla store closes for players whose goods level with its faction is below 1,
+            // and every new world day is logged.
+            if (_syx.IsServer)
+                _syx.Subscribe(SyntrixApi.TimeNewDayEvent, o => _log.Info("a new world day began"));
+            _syx.RepGateType("MyObjectBuilder_StoreBlock", 1);
+
             // Chat command handled on the server.
             _syx.ChatRegister("syxexample", MyPromoteLevel.None, true, "count watched doors", (sender, args) =>
             {
+                // API 6: the greeting costs 10 credits after the player's discount at a faction, if a faction is named.
+                var player = FindSender(sender);
+                if (player != null && args.Length > 0)
+                {
+                    long cost = _syx.RepPrice(player.IdentityId, args[0], 10, true);
+                    if (!_syx.AccountCharge(player.IdentityId, cost, "SyntrixExample.Greeting"))
+                        return "Not enough money (" + cost + " credits).";
+                }
                 int n = 0;
                 MyAPIGateway.Entities.GetEntities(null, e =>
                 {
@@ -271,6 +288,13 @@ namespace SyntrixExample
         }
 
         /// <summary>Undocks from Syntrix.</summary>
+        private static IMyPlayer FindSender(ulong steamId)
+        {
+            var players = new List<IMyPlayer>();
+            MyAPIGateway.Players.GetPlayers(players, p => p.SteamUserId == steamId);
+            return players.Count > 0 ? players[0] : null;
+        }
+
         protected override void UnloadData()
         {
             SyntrixControls<IMyDoor>.Unload();

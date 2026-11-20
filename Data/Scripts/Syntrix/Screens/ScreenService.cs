@@ -18,8 +18,8 @@ namespace Syntrix.Screens
     /// <summary>
     /// Fixed screens (API 4, players only). A mod registers a block type and a screen index with a content function;
     /// Syntrix asks it about every 100 frames for each such block within 150 m of the camera and draws the lines in one
-    /// board style, only when the content changed (or someone changed the screen). The screen settings of these blocks
-    /// are removed from the K menu.
+    /// board style, only when the content changed (or someone changed the screen). The screen settings leave the K menu
+    /// of the blocks whose content is not empty (1.5.0: before, of every block of the type).
     /// Content: lines separated by "\n", each "kind\ttext"; the title takes "T\tsymbol\ttext" (symbol = LCD texture,
     /// may be empty). Kinds: A alarm bar, T title, N name, S small, V value, H hint, F foot (bottom line), G gap.
     /// "{F}" in a text is replaced by the key of the use control. Null or "" leaves the screen as it is.
@@ -189,9 +189,24 @@ namespace Syntrix.Screens
 
         private void HideScreenControls(IMyTerminalBlock block, List<IMyTerminalControl> controls)
         {
-            if (block == null || !_types.Contains(UseKey(block)))
+            if (block == null)
                 return;
-            controls.RemoveAll(c => c != null && ScreenControls.Contains(c.Id));
+            string type = UseKey(block);
+            if (!_types.Contains(type))
+                return;
+            // only blocks that show a board lose their screen settings; the others of the type keep them
+            bool drawn = false;
+            foreach (var pair in _entries)
+            {
+                if (!pair.Key.StartsWith(type + "|", StringComparison.Ordinal))
+                    continue;
+                try { drawn = !string.IsNullOrEmpty(pair.Value.Content(block.EntityId)); }
+                catch (Exception e) { Log.Error("screen content of " + pair.Value.Mod, e); }
+                if (drawn)
+                    break;
+            }
+            if (drawn)
+                controls.RemoveAll(c => c != null && ScreenControls.Contains(c.Id));
         }
 
         private void Update(IMyTerminalBlock block, IngameSurface surface, int index, Entry e)

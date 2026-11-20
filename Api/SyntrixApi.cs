@@ -1,4 +1,4 @@
-// Syntrix dock file (API version 5, Syntrix 1.4.0). Copy this file into your mod's script folder.
+// Syntrix dock file (API version 6, Syntrix 1.5.0). Copy this file into your mod's script folder.
 // Do not edit it; take a newer copy from the Syntrix repository instead.
 // Windows and screen elements: also copy SyntrixGui.cs (optional dock file of the window service).
 //
@@ -38,7 +38,7 @@ namespace Syntrix.Api
         public const long Channel = 8346120579001L;
 
         /// <summary>API version of this dock file.</summary>
-        public const int ApiVersion = 5;
+        public const int ApiVersion = 6;
 
         /// <summary>Prefix for notification arguments that are text keys themselves.</summary>
         public const char TextArgPrefix = '\u0001';
@@ -267,6 +267,25 @@ namespace Syntrix.Api
         private Func<long, string, int, string, int, int> _repChange;
         private Action<long, string, int, string> _repSet;
         private Action<long> _repReset;
+        // API 6
+        private Func<long, string, long, bool, long> _repPrice;
+        private Func<long, long, bool> _repRefuses;
+        private Action<string, int> _repGateType;
+        private Action<long, int> _repGateBlock;
+        private Func<long, int> _repMinGoods;
+        private Func<long, long> _accBalance;
+        private Func<long, long, string, bool> _accCharge, _accPay;
+        private Func<string, long> _accFactionBalance;
+        private Func<string, long, string, bool> _accFactionChange;
+        private Action<string> _priceChanged;
+        private Func<long> _timeUtc;
+        private Func<double> _timeWorldDays;
+        private Func<MyTuple<int, int, double>> _timeWorldDate;
+        private Func<bool, string> _timeWorldText;
+        private Func<VRageMath.Vector3D, MyTuple<bool, double, float, bool>> _timeLocal;
+        private Func<VRageMath.Vector3D, bool, string> _timeLocalText;
+        private Func<VRageMath.Vector3D, MyTuple<string, string>> _timeCalendar;
+        private Func<VRageMath.Vector3D, bool> _timeIsNight;
 
         private void Bind()
         {
@@ -341,6 +360,25 @@ namespace Syntrix.Api
             _repChange = Get<Func<long, string, int, string, int, int>>("Rep.Change");
             _repSet = Get<Action<long, string, int, string>>("Rep.Set");
             _repReset = Get<Action<long>>("Rep.ResetStart");
+            _repPrice = Get<Func<long, string, long, bool, long>>("Rep.Price");
+            _repRefuses = Get<Func<long, long, bool>>("Rep.Refuses");
+            _repGateType = Get<Action<string, int>>("Rep.GateType");
+            _repGateBlock = Get<Action<long, int>>("Rep.GateBlock");
+            _repMinGoods = Get<Func<long, int>>("Rep.MinGoods");
+            _accBalance = Get<Func<long, long>>("Account.Balance");
+            _accCharge = Get<Func<long, long, string, bool>>("Account.Charge");
+            _accPay = Get<Func<long, long, string, bool>>("Account.Pay");
+            _accFactionBalance = Get<Func<string, long>>("Account.FactionBalance");
+            _accFactionChange = Get<Func<string, long, string, bool>>("Account.FactionChange");
+            _priceChanged = Get<Action<string>>("Price.Changed");
+            _timeUtc = Get<Func<long>>("Time.Utc");
+            _timeWorldDays = Get<Func<double>>("Time.WorldDays");
+            _timeWorldDate = Get<Func<MyTuple<int, int, double>>>("Time.WorldDate");
+            _timeWorldText = Get<Func<bool, string>>("Time.WorldText");
+            _timeLocal = Get<Func<VRageMath.Vector3D, MyTuple<bool, double, float, bool>>>("Time.Local");
+            _timeLocalText = Get<Func<VRageMath.Vector3D, bool, string>>("Time.LocalText");
+            _timeCalendar = Get<Func<VRageMath.Vector3D, MyTuple<string, string>>>("Time.Calendar");
+            _timeIsNight = Get<Func<VRageMath.Vector3D, bool>>("Time.IsNight");
         }
 
         // ---------- info ----------
@@ -605,8 +643,8 @@ namespace Syntrix.Api
 
         /// <summary>
         /// API 4. Content of a fixed screen of a block type. Syntrix calls the function about every 100 frames for each
-        /// such block within 150 m and draws only when the text changed; the screen settings of the block leave the
-        /// K menu. Build the text with <see cref="ScreenLine"/> and <see cref="ScreenTitle"/>; null or "" leaves the
+        /// such block within 150 m and draws only when the text changed; the screen settings leave the K menu of the
+        /// blocks with a text (API 6; before, of all blocks of the type). Build the text with <see cref="ScreenLine"/> and <see cref="ScreenTitle"/>; null or "" leaves the
         /// screen as it is. A null function removes the registration. Players only, may be called before ready.
         /// </summary>
         /// <param name="blockKey">"TypeId/SubtypeId" without "MyObjectBuilder_".</param>
@@ -652,7 +690,7 @@ namespace Syntrix.Api
         // ---------- price requests (API 4) ----------
 
         /// <summary>
-        /// API 4. Registers this mod as price giver of a service (e.g. "Hangar.Store"). The giver gets the service name
+        /// API 4. Registers this mod as price giver of a service (e.g. "Npc.Repair"). The giver gets the service name
         /// and the description (lines "key=value", see <see cref="PriceLine"/>) and returns the price, or -1 for
         /// "no price". Null removes it. Register where prices are asked (usually the server); may be called before ready.
         /// </summary>
@@ -867,6 +905,129 @@ namespace Syntrix.Api
             Subscribe(RepChangedEvent, h);
             return h;
         }
+
+        // ---------- reputation gate and prices (API 6, Syntrix 1.5.0) ----------
+
+        /// <summary>
+        /// API 6. Price for a player at a faction after the trade percent of the player's tier. playerBuys true: the
+        /// percent is a discount (rounded up); false (the faction pays the player): a markup (rounded down). Without
+        /// framework, faction or tier the price comes back unchanged.
+        /// </summary>
+        /// <param name="identity">Player identity id.</param>
+        /// <param name="tag">Faction tag.</param>
+        /// <param name="price">Base price.</param>
+        /// <param name="playerBuys">True when the player pays.</param>
+        public long RepPrice(long identity, string tag, long price, bool playerBuys) { return _repPrice != null ? _repPrice(identity, tag, price, playerBuys) : price; }
+
+        /// <summary>
+        /// API 6. True when the block belongs to a defined faction, the player is no member and the player's goods level
+        /// with it is below what the block asks for (<see cref="RepGateBlock"/>, <see cref="RepGateType"/>, else 1).
+        /// Server and the player's own machine.
+        /// </summary>
+        /// <param name="blockId">Block entity id.</param>
+        /// <param name="identity">Player identity id.</param>
+        public bool RepRefuses(long blockId, long identity) { return _repRefuses != null && _repRefuses(blockId, identity); }
+
+        /// <summary>
+        /// API 6. All machines: every block of this type ("MyObjectBuilder_StoreBlock" or "TypeId/SubtypeId") closes its
+        /// terminal, F screen and store for players whose goods level with the owning faction is below minGoods. 0 removes
+        /// the type. Blocks with Syntrix's F action (SyntrixUse) are gated anyway (goods level 1).
+        /// </summary>
+        /// <param name="type">Block type.</param>
+        /// <param name="minGoods">Lowest goods level, 0 = off.</param>
+        public void RepGateType(string type, int minGoods) { WhenReady(() => { if (_repGateType != null) _repGateType(type, minGoods); }); }
+
+        /// <summary>API 6. Server: lowest goods level of one block, saved with the block; 0 = the type's value.</summary>
+        /// <param name="blockId">Block entity id.</param>
+        /// <param name="minGoods">Lowest goods level, 0 = default.</param>
+        public void RepGateBlock(long blockId, int minGoods) { if (_repGateBlock != null) _repGateBlock(blockId, minGoods); }
+
+        /// <summary>API 6. Lowest goods level a block asks for (its own, its type's, else 1).</summary>
+        /// <param name="blockId">Block entity id.</param>
+        public int RepMinGoods(long blockId) { return _repMinGoods != null ? _repMinGoods(blockId) : 1; }
+
+        // ---------- accounts (API 6, Syntrix 1.5.0, server) ----------
+
+        /// <summary>API 6. Event name of a balance change made through Syntrix; payload MyTuple&lt;long identity (0 = faction), string tag (null = player), long change, string reason&gt;.</summary>
+        public const string AccountChangedEvent = "Syntrix.Account.Changed";
+
+        /// <summary>API 6. Server: balance of an online player, -1 when not online or without framework.</summary>
+        /// <param name="identity">Player identity id.</param>
+        public long AccountBalance(long identity) { return _accBalance != null ? _accBalance(identity) : -1; }
+
+        /// <summary>
+        /// API 6. Server: takes the amount from an online player when the balance covers it (also counting what was taken
+        /// earlier in the same frame). False and nothing taken otherwise.
+        /// </summary>
+        /// <param name="identity">Player identity id.</param>
+        /// <param name="amount">Amount, not negative.</param>
+        /// <param name="reason">Reason for the event, e.g. "MyMod.Repair".</param>
+        public bool AccountCharge(long identity, long amount, string reason) { return _accCharge != null && _accCharge(identity, amount, reason); }
+
+        /// <summary>API 6. Server: gives an online player the amount.</summary>
+        /// <param name="identity">Player identity id.</param>
+        /// <param name="amount">Amount, not negative.</param>
+        /// <param name="reason">Reason for the event.</param>
+        public bool AccountPay(long identity, long amount, string reason) { return _accPay != null && _accPay(identity, amount, reason); }
+
+        /// <summary>API 6. Server: balance of a faction, -1 when it does not exist.</summary>
+        /// <param name="tag">Faction tag.</param>
+        public long AccountFactionBalance(string tag) { return _accFactionBalance != null ? _accFactionBalance(tag) : -1; }
+
+        /// <summary>API 6. Server: changes a faction's balance; a negative change only when the balance covers it.</summary>
+        /// <param name="tag">Faction tag.</param>
+        /// <param name="delta">Change.</param>
+        /// <param name="reason">Reason for the event.</param>
+        public bool AccountFactionChange(string tag, long delta, string reason) { return _accFactionChange != null && _accFactionChange(tag, delta, reason); }
+
+        // ---------- price changes (API 6) ----------
+
+        /// <summary>API 6. Event name raised by <see cref="PriceChanged"/>; payload: the service name (string).</summary>
+        public const string PriceChangedEvent = "Syntrix.Price.Changed";
+
+        /// <summary>API 6. A price giver tells the askers that its prices of a service changed (raised where it is called).</summary>
+        /// <param name="service">Service name, e.g. "Npc.Repair".</param>
+        public void PriceChanged(string service) { if (_priceChanged != null) _priceChanged(service); }
+
+        // ---------- world clock (API 6, Syntrix 1.5.0) ----------
+
+        /// <summary>API 6. Event on the player's machine: HUD values of the clock, MyTuple&lt;string key, object value&gt;, only on change.</summary>
+        public const string TimeHudEvent = "Syntrix.Time.Hud";
+        /// <summary>API 6. Event on the server: a new world day began, MyTuple&lt;int year, int day&gt;.</summary>
+        public const string TimeNewDayEvent = "Syntrix.Time.NewDay";
+
+        /// <summary>API 6. Real UTC time aligned to the server clock (local clock without framework).</summary>
+        public DateTime TimeUtc { get { return _timeUtc != null ? new DateTime(_timeUtc(), DateTimeKind.Utc) : DateTime.UtcNow; } }
+
+        /// <summary>API 6. World days since year 1, day 1, 00:00 (fraction = time of day); 0 without framework.</summary>
+        public double TimeWorldDays { get { return _timeWorldDays != null ? _timeWorldDays() : 0; } }
+
+        /// <summary>API 6. World date: year, day of the year from 1, hour 0 to 24.</summary>
+        public MyTuple<int, int, double> TimeWorldDate() { return _timeWorldDate != null ? _timeWorldDate() : new MyTuple<int, int, double>(1, 1, 0); }
+
+        /// <summary>API 6. World date and time as text in this machine's language.</summary>
+        /// <param name="twelveHour">12 hour clock.</param>
+        public string TimeWorldText(bool twelveHour = false) { return _timeWorldText != null ? _timeWorldText(twelveHour) : ""; }
+
+        /// <summary>API 6. Local time at a place near a planet: valid, hours 0 to 24, sun height in degrees, night.</summary>
+        /// <param name="position">Place in world coordinates.</param>
+        public MyTuple<bool, double, float, bool> TimeLocal(VRageMath.Vector3D position)
+        {
+            return _timeLocal != null ? _timeLocal(position) : new MyTuple<bool, double, float, bool>(false, 0, 0f, false);
+        }
+
+        /// <summary>API 6. Local time as "HH:mm", "--:--" without one.</summary>
+        /// <param name="position">Place in world coordinates.</param>
+        /// <param name="twelveHour">12 hour clock.</param>
+        public string TimeLocalText(VRageMath.Vector3D position, bool twelveHour = false) { return _timeLocalText != null ? _timeLocalText(position, twelveHour) : "--:--"; }
+
+        /// <summary>API 6. Planet calendar at a place: name and date text, both null without one.</summary>
+        /// <param name="position">Place in world coordinates.</param>
+        public MyTuple<string, string> TimeCalendar(VRageMath.Vector3D position) { return _timeCalendar != null ? _timeCalendar(position) : new MyTuple<string, string>(null, null); }
+
+        /// <summary>API 6. Night at a place by sun height (false without local time).</summary>
+        /// <param name="position">Place in world coordinates.</param>
+        public bool TimeIsNight(VRageMath.Vector3D position) { return _timeIsNight != null && _timeIsNight(position); }
 
         // ---------- helpers without endpoint (1.3.0) ----------
 

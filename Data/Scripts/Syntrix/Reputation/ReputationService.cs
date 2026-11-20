@@ -108,6 +108,7 @@ namespace Syntrix.Reputation
             _pending.Clear();
             _notices.Clear();
             _recovery.Clear();
+            _gateTypes.Clear();
         }
 
         /// <summary>Server: writes the marks with the world.</summary>
@@ -309,17 +310,135 @@ namespace Syntrix.Reputation
         /// </summary>
         public bool Refuses(IMyCubeBlock block, long identity, out string factionName)
         {
+            return Refuses(block, identity, MinGoods(block), out factionName);
+        }
+
+        /// <summary>
+        /// 1.5.0: true when the block belongs to a defined faction, the player is no member and the player's goods level
+        /// with that faction is below minGoods (1 = the faction must trade at all).
+        /// </summary>
+        public bool Refuses(IMyCubeBlock block, long identity, int minGoods, out string factionName)
+        {
             factionName = null;
-            if (block == null || identity == 0 || block.OwnerId == 0)
+            if (block == null || identity == 0 || block.OwnerId == 0 || minGoods <= 0)
                 return false;
             var f = MyAPIGateway.Session?.Factions?.TryGetPlayerFaction(block.OwnerId);
             if (f == null || f.IsMember(identity) || Def(f.Tag, false) == null)
                 return false;
             var info = Info(identity, f.Tag);
-            if (info.Item1 == int.MinValue || info.Item4 != 0)
+            if (info.Item1 == int.MinValue || info.Item4 >= minGoods)
                 return false;
             factionName = f.Name;
             return true;
+        }
+
+        /// <summary>API 6: true when the block refuses the player (see <see cref="Refuses(IMyCubeBlock, long, int, out string)"/>).</summary>
+        public bool RefusesById(long blockId, long identity)
+        {
+            var block = MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock;
+            string name;
+            return Refuses(block, identity, MinGoods(block), out name);
+        }
+
+        /// <summary>
+        /// API 6: price for a player at a faction after the trade percent of the player's tier. playerBuys: the percent
+        /// is a discount (rounded up); otherwise the faction pays and the percent is a markup (rounded down). A negative
+        /// percent works the other way. Unknown faction or player: the price unchanged.
+        /// </summary>
+        public long Price(long identity, string tag, long price, bool playerBuys)
+        {
+            if (price <= 0)
+                return price;
+            var info = Info(identity, tag);
+            if (info.Item1 == int.MinValue || info.Item3 == 0f)
+                return price;
+            double p = Math.Max(-100.0, Math.Min(100.0, info.Item3)) / 100.0;
+            return playerBuys ? (long)Math.Ceiling(price * (1.0 - p)) : (long)Math.Floor(price * (1.0 + p));
+        }
+
+        // ---------- gate at any terminal block (API 6, 1.5.0) ----------
+
+        /// <summary>Block setting key (mod "Syntrix") with the lowest goods level a block asks for.</summary>
+        public const string GoodsKey = "rep.goods";
+
+        private readonly Dictionary<string, int> _gateTypes = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private int _gateTick;
+        private long _gateShown;
+
+        /// <summary>
+        /// API 6, all machines: every block of this type (TypeId like "MyObjectBuilder_StoreBlock", or "TypeId/SubtypeId")
+        /// closes its terminal and F screen for players whose goods level with the owning faction is below minGoods.
+        /// 0 removes the type.
+        /// </summary>
+        public void GateType(string type, int minGoods)
+        {
+            if (string.IsNullOrWhiteSpace(type))
+                return;
+            if (minGoods <= 0)
+                _gateTypes.Remove(type);
+            else
+                _gateTypes[type] = minGoods;
+        }
+
+        /// <summary>API 6, server: lowest goods level of one block (saved with the block, all machines see it); 0 = the type's default.</summary>
+        public void GateBlock(long blockId, int minGoods)
+        {
+            if (!_core.IsServer)
+                return;
+            _core.Blocks.Set(blockId, "Syntrix", GoodsKey, minGoods > 0 ? minGoods.ToString(CultureInfo.InvariantCulture) : null);
+        }
+
+        /// <summary>Lowest goods level the block asks for: its own value, else its type's, else 1 (the faction must trade).</summary>
+        public int MinGoods(IMyCubeBlock block)
+        {
+            int own = OwnGoods(block);
+            if (own > 0)
+                return own;
+            int typed = TypeGoods(block);
+            return typed > 0 ? typed : 1;
+        }
+
+        private int OwnGoods(IMyCubeBlock block)
+        {
+            if (block == null || _core.Blocks == null)
+                return 0;
+            return ToInt(_core.Blocks.Get(block.EntityId, "Syntrix", GoodsKey), 0);
+        }
+
+        private int TypeGoods(IMyCubeBlock block)
+        {
+            if (block == null || _gateTypes.Count == 0)
+                return 0;
+            var id = block.BlockDefinition;
+            int v;
+            if (_gateTypes.TryGetValue(id.TypeId.ToString() + "/" + id.SubtypeName, out v))
+                return v;
+            return _gateTypes.TryGetValue(id.TypeId.ToString(), out v) ? v : 0;
+        }
+
+        /// <summary>Player machine, every frame: closes the terminal while it shows a gated block that refuses the player.</summary>
+        public void GateTick()
+        {
+            if (!_core.IsPlayer || ++_gateTick % 10 != 0)
+                return;
+            var gui = MyAPIGateway.Gui;
+            if (gui == null || gui.GetCurrentScreen == MyTerminalPageEnum.None)
+            {
+                _gateShown = 0;
+                return;
+            }
+            var block = gui.InteractedEntity as IMyCubeBlock;
+            var player = MyAPIGateway.Session.Player;
+            if (block == null || player == null || (OwnGoods(block) <= 0 && TypeGoods(block) <= 0))
+                return;
+            string name;
+            if (!Refuses(block, player.IdentityId, MinGoods(block), out name))
+                return;
+            gui.CloseTerminalScreen();
+            if (_gateShown == block.EntityId)
+                return;
+            _gateShown = block.EntityId;
+            _core.Net.ShowLocal("Syntrix_Rep_Refused", "{0} refuses you access: your reputation is too low.", new[] { name }, 3000, "Red");
         }
 
         /// <summary>Tier of a value, -1 when no tiers are defined.</summary>

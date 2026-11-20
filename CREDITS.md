@@ -13,4 +13,8 @@ Syntrix is its own code. The docking idea follows public patterns of:
 The window service draws with the textures of Space Engineers' own GUI (Keen Software House), which
 every player has; Syntrix ships none of them.
 
+AutoLCD (`Data/Scripts/Syntrix/AutoLcd`) is operated like **Automatic LCDs 2** by MMaster (Steam Workshop
+822950976, guide 407158161), so existing screens keep working. No code, texts or data of it were used; it is an
+own implementation under the MIT license. Thanks, MMaster!
+
 Thanks to everybody who documented the Space Engineers ModAPI and its pitfalls.
