@@ -22,6 +22,7 @@ namespace Syntrix.AutoLcd
         private bool _started;
         private bool _registered;
         private bool _isServer;
+        private double _lastNow = double.NaN;
 
         public override void LoadData()
         {
@@ -108,6 +109,7 @@ namespace Syntrix.AutoLcd
                         return;
                     Start();
                 }
+                CheckTime();
                 RunInterceptor.Update();
                 if (!_isServer || AutoLcdCore.Paused)
                     return;
@@ -120,6 +122,26 @@ namespace Syntrix.AutoLcd
             {
                 AutoLcdCore.Log.Error("update", e);
             }
+        }
+
+        /// <summary>
+        /// The game time (ElapsedPlayTime) must not go back; if it does anyway, every remembered due time would
+        /// hold its work until the old time is reached again. Then all of them start anew.
+        /// </summary>
+        private void CheckTime()
+        {
+            double now = AutoLcdCore.Now;
+            if (!double.IsNaN(_lastNow) && now < _lastNow - 0.5)
+            {
+                AutoLcdCore.Log.Info("game time went back from " + _lastNow.ToString("0") + " s to " + now.ToString("0") + " s, due times reset");
+                RunInterceptor.ResetTimes();
+                BlockSource.Clear();
+                JumpDriveCommands.Clear();
+                ShipCommands.Clear();
+                if (_isServer)
+                    ScreenRegistry.ResetTimes();
+            }
+            _lastNow = now;
         }
 
         private void Start()

@@ -82,9 +82,12 @@ namespace Syntrix.AutoLcd
                 _sources.Remove(key);
         }
 
+        /// <summary>Forgets all sources (world end, or the game time went back: their build times are void).</summary>
         public static void Clear()
         {
             _sources.Clear();
+            _drop.Clear();
+            WorldChanges = 0;
         }
 
         /// <summary>Accessible blocks of a group (exact name); empty if there is none.</summary>

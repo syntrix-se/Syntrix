@@ -21,6 +21,7 @@ namespace Syntrix.AutoLcd
         private const double FullScanSeconds = 3;
         private const double PlayerSeconds = 1;
         private const double StartBootSeconds = 60;
+        private const double DataLogSeconds = 30;
 
         private static readonly HashSet<IMyCubeGrid> _grids = new HashSet<IMyCubeGrid>();
         private static readonly HashSet<IMyCubeGrid> _waitingGrids = new HashSet<IMyCubeGrid>();
@@ -36,6 +37,7 @@ namespace Syntrix.AutoLcd
         private static readonly List<IMyPlayer> _playerList = new List<IMyPlayer>();
         private static readonly List<IMyCubeGrid> _groupGrids = new List<IMyCubeGrid>();
         private static readonly Dictionary<long, long> _constructOfGrid = new Dictionary<long, long>();
+        private static readonly Dictionary<long, double> _dataLogged = new Dictionary<long, double>();
         private static int _scanIndex;
         private static int _orderIndex;
         private static double _nextPlayers;
@@ -56,6 +58,11 @@ namespace Syntrix.AutoLcd
             public readonly List<ManagedScreen> Screens = new List<ManagedScreen>();
 
             public Action<IMyTerminalBlock> Changed;
+
+            public Action<IMyTerminalBlock> DataChanged;
+
+            /// <summary>CustomDataChanged came since the last detection (for the log line in Detect).</summary>
+            public bool DataEvent;
         }
 
         /// <summary>Screens of one construct and owner, scheduled together.</summary>
@@ -93,6 +100,9 @@ namespace Syntrix.AutoLcd
 
         public static void Start()
         {
+            // Static fields survive loading another (or the same) world in the same game process, and
+            // ElapsedPlayTime starts again from the saved value: forget all times and counters of the last world.
+            ResetState();
             _running = true;
             _startTime = AutoLcdCore.Now;
             var entities = new HashSet<IMyEntity>();
@@ -133,6 +143,43 @@ namespace Syntrix.AutoLcd
             _constructs.Clear();
             _order.Clear();
             _constructOfGrid.Clear();
+            ResetState();
+        }
+
+        // Times, indices and scratch lists; the tracked blocks stay.
+        private static void ResetState()
+        {
+            _scanIndex = 0;
+            _orderIndex = 0;
+            _nextPlayers = 0;
+            _scanStarted = double.MinValue;
+            _startTime = 0;
+            _relink = false;
+            _regroup = false;
+            ScreenCount = 0;
+            _players.Clear();
+            _playerList.Clear();
+            _dirtyNow.Clear();
+            _groupGrids.Clear();
+            _dataLogged.Clear();
+        }
+
+        /// <summary>The game time went back (loaded save within the session): all due times start anew.</summary>
+        public static void ResetTimes()
+        {
+            _nextPlayers = 0;
+            _scanIndex = 0;
+            _scanStarted = double.MinValue;
+            _startTime = AutoLcdCore.Now;
+            _dataLogged.Clear();
+            foreach (var entry in _entries.Values)
+            {
+                _dirty.Add(entry.Block.EntityId);
+                foreach (var screen in entry.Screens)
+                    screen.ResetTimes();
+            }
+            foreach (long id in _programs.Keys)
+                _dirty.Add(id);
         }
 
         // ---------------------------------------------------------------- tracking
@@ -214,8 +261,13 @@ namespace Syntrix.AutoLcd
                 return;
             var entry = new Entry { Block = block };
             entry.Changed = b => _dirty.Add(b.EntityId);
+            entry.DataChanged = b =>
+            {
+                entry.DataEvent = true;
+                _dirty.Add(b.EntityId);
+            };
             block.CustomNameChanged += entry.Changed;
-            block.CustomDataChanged += entry.Changed;
+            block.CustomDataChanged += entry.DataChanged;
             _entries[block.EntityId] = entry;
             _scan.Add(block.EntityId);
             _dirty.Add(block.EntityId);
@@ -246,7 +298,19 @@ namespace Syntrix.AutoLcd
         private static void Unhook(Entry entry)
         {
             entry.Block.CustomNameChanged -= entry.Changed;
-            entry.Block.CustomDataChanged -= entry.Changed;
+            entry.Block.CustomDataChanged -= entry.DataChanged;
+        }
+
+        // One log line per block and half minute: whether a new Custom Data came by CustomDataChanged or was only
+        // found by the scan round (shows in tests whether the event arrives).
+        private static void LogData(IMyTerminalBlock block, bool byEvent)
+        {
+            double now = AutoLcdCore.Now;
+            double last;
+            if (_dataLogged.TryGetValue(block.EntityId, out last) && now - last < DataLogSeconds && now >= last)
+                return;
+            _dataLogged[block.EntityId] = now;
+            AutoLcdCore.Log.Info("custom data of \"" + block.CustomName + "\" changed, " + (byEvent ? "seen by CustomDataChanged" : "found without CustomDataChanged (scan round or name change)"));
         }
 
         private static void OnProgramChanged(IMyTerminalBlock block)
@@ -358,8 +422,12 @@ namespace Syntrix.AutoLcd
 
             string data = block.CustomData ?? "";
             bool parsed = false;
+            bool byEvent = entry.DataEvent;
+            entry.DataEvent = false;
             if (entry.Parsed == null || entry.Data != data)
             {
+                if (entry.Data != null && entry.Data != data)
+                    LogData(block, byEvent);
                 entry.Data = data;
                 entry.Parsed = CommandParser.Parse(data);
                 parsed = true;
@@ -567,6 +635,11 @@ namespace Syntrix.AutoLcd
         /// <summary>One tick of work within the budget.</summary>
         public static void Update(double now, Stopwatch watch, long budgetTicks)
         {
+            // A time from before a jump back would hold the player list and the scan round until it is reached again.
+            if (_nextPlayers - now > PlayerSeconds)
+                _nextPlayers = 0;
+            if (_scanStarted > now)
+                _scanStarted = double.MinValue;
             if (now >= _nextPlayers)
             {
                 _nextPlayers = now + PlayerSeconds;

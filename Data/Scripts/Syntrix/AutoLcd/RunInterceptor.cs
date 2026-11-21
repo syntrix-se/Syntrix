@@ -36,6 +36,7 @@ namespace Syntrix.AutoLcd
 
         public static void Load()
         {
+            _nextLookup = 0;   // static: survives loading a world, ElapsedPlayTime starts again from the save
             MyAPIGateway.TerminalControls.CustomActionGetter += OnActions;
             if (!MyAPIGateway.Utilities.IsDedicated)
                 MyAPIGateway.TerminalControls.CustomControlGetter += OnControls;
@@ -59,6 +60,14 @@ namespace Syntrix.AutoLcd
             _infoHooked.Clear();
             _infoBlocks.Clear();
             _runWrapped = _defaultWrapped = false;
+            _nextLookup = 0;
+        }
+
+        /// <summary>The game time went back: due times start anew.</summary>
+        public static void ResetTimes()
+        {
+            _nextLookup = 0;
+            _statusAsked.Clear();
         }
 
         /// <summary>Looks for the actions of programmable blocks until they are wrapped (needed on servers).</summary>

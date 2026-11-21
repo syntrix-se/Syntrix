@@ -144,6 +144,14 @@ namespace Syntrix.AutoLcd
             _layout = "";
         }
 
+        /// <summary>The game time went back: all due times of this screen start anew.</summary>
+        public void ResetTimes()
+        {
+            Invalidate();
+            _nextScroll = 0;
+            _bootNext = 0;
+        }
+
         /// <summary>Scrolls by lines (negative = up).</summary>
         public void Scroll(int lines)
         {
