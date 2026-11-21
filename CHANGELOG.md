@@ -83,6 +83,14 @@ to use accounts, the reputation gate and price, and the world clock.
 - Settings in the world storage of Syntrix (`Syntrix-AutoLcd.xml`, written with defaults by the server). Screen
   texts come from `MyTexts_AutoLcd*.resx` of any loaded mod, with English fallbacks in the code.
 
+### NPC block category
+
+- New G menu category `NPC` (`Data/BlockCategories_Syntrix.sbc`, Name `SyxNpc`). In survival the game shows it to
+  admins only (`AvailableInSurvival` false). Mods add their NPC blocks under the same Name and repeat
+  `DisplayName` and `AvailableInSurvival`, because the first category of a Name that loads keeps its settings.
+- Admin only blocks: a block that the game reaches as a variant of another block (block variant group) stays
+  hidden in the G menu for admins too, so a group of admin only blocks shows as one entry.
+
 ## 1.4.1 (API version 5)
 
 No new endpoints; dock files stay valid.
