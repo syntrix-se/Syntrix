@@ -21,6 +21,7 @@ namespace Syntrix
                 core.Rep.Tick();
                 core.Accounts.Tick();
                 core.Time.Tick();
+                core.Supply.Tick();
                 if (core.IsPlayer)
                 {
                     core.Screens.Tick();

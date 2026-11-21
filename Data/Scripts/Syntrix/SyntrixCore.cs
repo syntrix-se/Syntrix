@@ -15,6 +15,7 @@ using Syntrix.Gui;
 using Syntrix.Price;
 using Syntrix.Reputation;
 using Syntrix.Screens;
+using Syntrix.Supply;
 using Syntrix.Time;
 using Syntrix.Use;
 using Syntrix.Wiki;
@@ -82,6 +83,8 @@ namespace Syntrix
         public TimeService Time;
         /// <summary>Shared HUD values on the player's machine (API 6, 1.5.0).</summary>
         public HudService Hud;
+        /// <summary>Supply of grid groups with fuel and ammo (API 6, 1.5.0).</summary>
+        public SupplyService Supply;
 
         private readonly Dictionary<string, int> _docked = new Dictionary<string, int>();
         private string _instanceKey;
@@ -129,6 +132,7 @@ namespace Syntrix
             Accounts = new AccountService(this);
             Hud = new HudService(this);
             Time = new TimeService(this);
+            Supply = new SupplyService(this);
             Net.Start();
             Blocks.Start();
             Chat.Start();
@@ -148,7 +152,10 @@ namespace Syntrix
         public override void SaveData()
         {
             if (Started)
+            {
                 Rep.Save();
+                Supply.Save();
+            }
         }
 
         /// <summary>Stops the services.</summary>
@@ -168,6 +175,7 @@ namespace Syntrix
                 Accounts.Stop();
                 Time.Stop();
                 Hud.Stop();
+                Supply.Stop();
                 TimeControls.Unload();
                 Watch.Stop();
                 Gui.Stop();
@@ -422,6 +430,11 @@ namespace Syntrix
             d["Hud.Set"] = new Action<string, object>(Hud.Set);
             d["Hud.Get"] = new Func<string, object>(Hud.Get);
             d["Hud.Keys"] = new Func<string[]>(Hud.Keys);
+            d["Supply.Profile"] = new Action<string, string>((name, settings) => Supply.DefineProfile(modName, name, settings));
+            d["Supply.RegisterSource"] = new Action<string>(block => Supply.RegisterSource(modName, block));
+            d["Supply.Watch"] = new Action<long, string>(Supply.StartWatch);
+            d["Supply.Unwatch"] = new Action<long>(Supply.Unwatch);
+            d["Supply.IsWatched"] = new Func<long, bool>(Supply.IsWatched);
 
             // Wiki (API 3)
             d["Wiki.Open"] = new Func<string, bool>(Wiki.Open);

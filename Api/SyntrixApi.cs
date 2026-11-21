@@ -289,6 +289,11 @@ namespace Syntrix.Api
         private Action<string, object> _hudSet;
         private Func<string, object> _hudGet;
         private Func<string[]> _hudKeys;
+        private Action<string, string> _supplyProfile;
+        private Action<string> _supplySource;
+        private Action<long, string> _supplyWatch;
+        private Action<long> _supplyUnwatch;
+        private Func<long, bool> _supplyIsWatched;
 
         private void Bind()
         {
@@ -385,6 +390,11 @@ namespace Syntrix.Api
             _hudSet = Get<Action<string, object>>("Hud.Set");
             _hudGet = Get<Func<string, object>>("Hud.Get");
             _hudKeys = Get<Func<string[]>>("Hud.Keys");
+            _supplyProfile = Get<Action<string, string>>("Supply.Profile");
+            _supplySource = Get<Action<string>>("Supply.RegisterSource");
+            _supplyWatch = Get<Action<long, string>>("Supply.Watch");
+            _supplyUnwatch = Get<Action<long>>("Supply.Unwatch");
+            _supplyIsWatched = Get<Func<long, bool>>("Supply.IsWatched");
         }
 
         // ---------- info ----------
@@ -1061,6 +1071,49 @@ namespace Syntrix.Api
 
         /// <summary>API 6. All keys that have a HUD value right now (e.g. to fill a display after docking).</summary>
         public string[] HudKeys() { return _hudKeys != null ? _hudKeys() : new string[0]; }
+
+        // ---------- supply of grid groups (API 6, Syntrix 1.5.0, server) ----------
+
+        /// <summary>
+        /// API 6. Server: defines or replaces a supply profile (name with mod prefix, e.g. "MyMod.Base"). Settings are lines
+        /// "key=value" (<see cref="SupplyLine"/>): CheckSeconds (5), NpcOnly (true: only blocks owned by an NPC),
+        /// Reactors (true), ReactorFuel (10 pieces), WeaponMagazines (4 per weapon), StockPerWeapon (10 default magazines
+        /// per weapon), RefillSeconds (120), RefillPerWeapon (1). Missing keys keep these defaults. May be called before ready.
+        /// </summary>
+        /// <param name="name">Profile name.</param>
+        /// <param name="settings">Lines "key=value".</param>
+        public void SupplyProfile(string name, string settings) { WhenReady(() => { if (_supplyProfile != null) _supplyProfile(name, settings); }); }
+
+        /// <summary>API 6. One line "key=value" of a supply profile.</summary>
+        /// <param name="key">Key.</param>
+        /// <param name="value">Value (numbers with a dot, true/false).</param>
+        public static string SupplyLine(string key, string value) { return Clean(key).Replace("=", "") + "=" + Clean(value) + "\n"; }
+
+        /// <summary>
+        /// API 6. A block type "TypeId/SubtypeId" whose inventory holds the stock of a supplied group (an ammo store):
+        /// Syntrix fills it once, refills it slowly and loads the weapons from it; what lies inside is loot. Groups without
+        /// such a block get an invisible stock. Call it where the server runs; may be called before ready.
+        /// </summary>
+        /// <param name="blockKey">"TypeId/SubtypeId" without "MyObjectBuilder_".</param>
+        public void SupplyRegisterSource(string blockKey) { WhenReady(() => { if (_supplySource != null) _supplySource(blockKey); }); }
+
+        /// <summary>
+        /// API 6. Server: keeps the mechanical grid group of the anchor (a block or grid entity id) supplied with the profile:
+        /// reactors on and fuelled, weapons loaded from the stock of the group, out of nothing and without conveyors. Lasts
+        /// until <see cref="SupplyUnwatch"/>; not saved, so watch again after a restart (the stock is saved). Calling it
+        /// again only changes the profile.
+        /// </summary>
+        /// <param name="anchorId">Block or grid entity id.</param>
+        /// <param name="profile">Profile name.</param>
+        public void SupplyWatch(long anchorId, string profile) { if (_supplyWatch != null) _supplyWatch(anchorId, profile); }
+
+        /// <summary>API 6. Server: ends the supply of the anchor and forgets its invisible stock.</summary>
+        /// <param name="anchorId">Block or grid entity id.</param>
+        public void SupplyUnwatch(long anchorId) { if (_supplyUnwatch != null) _supplyUnwatch(anchorId); }
+
+        /// <summary>API 6. Server: true while the anchor is supplied.</summary>
+        /// <param name="anchorId">Block or grid entity id.</param>
+        public bool SupplyIsWatched(long anchorId) { return _supplyIsWatched != null && _supplyIsWatched(anchorId); }
 
         // ---------- helpers without endpoint (1.3.0) ----------
 
