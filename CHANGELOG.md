@@ -61,6 +61,18 @@ to use accounts, the reputation gate and price, and the world clock.
 - Endpoints `Hud.Set`, `Hud.Get`, `Hud.Keys`; event `Syntrix.Hud` (`MyTuple<string, object>`) on change.
   Dock file: `HudSet`, `HudGet`, `HudNumber`, `HudText`, `HudKeys`, constant `HudEvent`.
 
+### Supply
+
+- Keeps a grid group supplied (server): reactors on and topped up with their item fuel, weapons loaded with the
+  magazines of their weapon definition, out of nothing and without conveyors. The stock per group (target per weapon,
+  filled once, then refilled slowly) lies in source blocks registered by any mod and is loot there; groups without
+  such a block keep an invisible stock, saved in `Syntrix-Supply.txt` in the world storage. Named profiles with
+  `CheckSeconds`, `NpcOnly`, `Reactors`, `ReactorFuel`, `WeaponMagazines`, `StockPerWeapon`, `RefillSeconds`,
+  `RefillPerWeapon`.
+- Endpoints `Supply.Profile`, `Supply.RegisterSource`, `Supply.Watch`, `Supply.Unwatch`, `Supply.IsWatched`.
+  Dock file: `SupplyProfile`, `SupplyLine`, `SupplyRegisterSource`, `SupplyWatch`, `SupplyUnwatch`,
+  `SupplyIsWatched`.
+
 ### AutoLCD
 
 - Syntrix AutoLCD is now part of Syntrix: text screens filled without a programmable block, operated like
