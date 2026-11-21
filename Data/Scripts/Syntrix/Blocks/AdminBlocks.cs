@@ -10,9 +10,10 @@ namespace Syntrix.Blocks
 {
     /// <summary>
     /// Blocks for admins only (API 4). A mod registers block types on every machine; every player machine shows them in
-    /// the G menu only while the local player has admin rank. GuiVisible hides them in the categories, Public also in the
-    /// G menu search; both apply to the own machine only. A machine without a player (dedicated server) keeps Public on,
-    /// so admins can build. On a listen server the host's rank decides Public for the server part as well.
+    /// the G menu only while the local player has admin rank and, in survival, creative tools on (Alt+F10). The rank
+    /// alone is not enough: in single player and for the host of a listen server the game always gives rank Owner.
+    /// GuiVisible hides them in the categories, Public also in the G menu search; both apply to the own machine only. A
+    /// machine without a player (dedicated server) keeps Public on; the game checks Public on building nowhere.
     /// Since 1.5 the server no longer razes such blocks; the notice arguments of Register stay for the dock file and
     /// have no effect.
     /// Block variant groups: the game shows only the first block of a group and reaches the others as variants. Such
@@ -79,10 +80,10 @@ namespace Syntrix.Blocks
         /// <summary>True if the block type is registered.</summary>
         public bool Has(string blockKey) { return blockKey != null && _entries.ContainsKey(blockKey); }
 
-        /// <summary>Every frame on players: follows the admin rank (every 300 frames).</summary>
+        /// <summary>Every frame on players: follows admin rank and creative tools (every 60 frames).</summary>
         public void Tick()
         {
-            if (_core.IsPlayer && ++_tick % 300 == 0)
+            if (_core.IsPlayer && ++_tick % 60 == 0)
                 UpdateVisibility(false);
         }
 
@@ -109,7 +110,9 @@ namespace Syntrix.Blocks
         {
             if (!_core.IsPlayer || MyAPIGateway.Session == null)
                 return;
-            bool admin = MyAPIGateway.Session.PromoteLevel >= MyPromoteLevel.Admin;
+            var session = MyAPIGateway.Session;
+            // EnableCopyPaste is in survival true only while creative tools are on (MySession.IsCopyPastingEnabled)
+            bool admin = session.PromoteLevel >= MyPromoteLevel.Admin && (session.CreativeMode || session.EnableCopyPaste);
             if (admin == _visible && !force)
                 return;
             _visible = admin;

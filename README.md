@@ -33,7 +33,7 @@ Copy the dock files into your mod's script folder and do not edit them:
 | F action | a block gets its own F action (`UseRegister`) through the UseObjectsComponent `SyntrixUse` that Syntrix ships; without a registered action F opens the terminal; K still opens the Vanilla terminal; both stay closed for players a faction with reputation rules does not trade with (1.4.1); a block without a registered action keeps its Vanilla use points (store, vending machine buttons), gated as well (1.5) |
 | Grid storage (server) | a grid group becomes a text (blueprint with block storage, relative to a frame, with its outline) and is spawned back after a space check, keeping the ids when they are free; plus the grid groups near a point (`GridsNearby`) |
 | Fixed screens (players) | a mod hands over lines for a block's screen; Syntrix draws them in one board style within 150 m, only on change, and takes the screen settings out of the K menu |
-| Admin only blocks | block types only admins see in the G menu and its search; G menu category NPC |
+| Admin only blocks | block types only admins with creative tools see in the G menu and its search; G menu category NPC |
 | Price requests | one mod gives prices for a service name, others ask with a description and get an amount or "no price" |
 | Block lights | the server sets colour, brightness and blinking of a block's status lights (emissive parts); Syntrix sends it to every player, also to later ones, and paints it again when the game repaints the block |
 | Short sounds | the server plays a short sound at a block or a place for the players within a radius |
