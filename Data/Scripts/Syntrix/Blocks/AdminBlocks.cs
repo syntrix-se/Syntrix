@@ -33,7 +33,6 @@ namespace Syntrix.Blocks
         private readonly BlockWatch _watch;
         private readonly Dictionary<string, Entry> _entries = new Dictionary<string, Entry>();
         private readonly List<IMySlimBlock> _raze = new List<IMySlimBlock>();
-        private HashSet<MyDefinitionId> _variants;
         private bool _watching, _visible;
         private int _tick;
 
@@ -105,26 +104,14 @@ namespace Syntrix.Blocks
                 e.Definition.GuiVisible = !e.Variant;
             _entries.Clear();
             _raze.Clear();
-            _variants = null;
         }
 
-        /// <summary>True if the block is reached as a variant of another block (BlockStages, set by the game for
-        /// block variant groups); the game hides such blocks in the G menu.</summary>
-        private bool IsVariant(MyCubeBlockDefinition definition)
+        /// <summary>True if the block is in a block variant group but is not the group's G menu block; the game hides
+        /// such blocks and reaches them as variants (MyBlockVariantGroup.Postprocess).</summary>
+        private static bool IsVariant(MyCubeBlockDefinition definition)
         {
-            if (_variants == null)
-            {
-                _variants = new HashSet<MyDefinitionId>();
-                foreach (var d in MyDefinitionManager.Static.GetAllDefinitions())
-                {
-                    var block = d as MyCubeBlockDefinition;
-                    if (block == null || block.BlockStages == null)
-                        continue;
-                    foreach (var stage in block.BlockStages)
-                        _variants.Add(stage);
-                }
-            }
-            return _variants.Contains(definition.Id);
+            var group = definition.BlockVariantsGroup;
+            return group != null && group.PrimaryGUIBlock != null && group.PrimaryGUIBlock != definition;
         }
 
         private void UpdateVisibility(bool force)
