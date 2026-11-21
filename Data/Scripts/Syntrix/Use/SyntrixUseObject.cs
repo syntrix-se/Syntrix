@@ -76,8 +76,9 @@ namespace Syntrix.Use
 
         /// <summary>
         /// 1.5.0: the game's own use object of this detector (store, vending machine button, terminal ...), made on the
-        /// first use without a registered action. The game makes it from the detector name; the detector is taken out
-        /// again at once, so it never becomes a second use point. Only from Use, never while the game walks the use points.
+        /// first use without a registered action. The game makes it from the detector name as an added detector, small and
+        /// inside the Syntrix use point, saved with the block and found again by name. Only from Use, never while the game
+        /// walks the use points.
         /// </summary>
         private IMyUseObject Vanilla()
         {
@@ -94,9 +95,12 @@ namespace Syntrix.Use
                 return null;
             try
             {
-                uint id = uses.AddDetector(_vanillaName, _dummyMatrix);
-                _vanilla = uses.GetInteractiveObject(id);
-                uses.RemoveDetector(id);
+                // Saved with the block, so after loading it is found by name. Never RemoveDetector: the game keeps the
+                // id in its list of added detectors and the next save fails (KeyNotFoundException in Serialize).
+                // A tenth of the size inside the Syntrix use point, so a player's ray always hits the Syntrix one first.
+                _vanilla = uses.GetInteractiveObject(_vanillaName);
+                if (_vanilla == null || _vanilla is SyntrixUseObject)
+                    _vanilla = uses.GetInteractiveObject(uses.AddDetector(_vanillaName, Matrix.CreateScale(0.1f) * _dummyMatrix));
             }
             catch (Exception x)
             {
