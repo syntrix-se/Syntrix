@@ -690,7 +690,8 @@ namespace Syntrix.Api
         // ---------- admin only blocks (API 4) ----------
 
         /// <summary>
-        /// API 4. A block type for admins only: in the G menu and its search only while the local player is admin.
+        /// API 4. A block type for admins only: in the G menu and its search only while the local player is admin and,
+        /// in survival, has creative tools on (Alt+F10).
         /// Call it on every machine; may be called before ready. Up to 1.4 the server also razed such a block built by a
         /// player without admin rank; since 1.5 it does not.
         /// </summary>
