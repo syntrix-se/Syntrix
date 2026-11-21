@@ -38,7 +38,13 @@ namespace Syntrix.AutoLcd
         private static readonly List<IMyCubeGrid> _groupGrids = new List<IMyCubeGrid>();
         private static readonly Dictionary<long, long> _constructOfGrid = new Dictionary<long, long>();
         private static readonly Dictionary<long, double> _dataLogged = new Dictionary<long, double>();
+        private static readonly List<long> _programScan = new List<long>();
+        private static readonly Dictionary<long, string> _plainProgram = new Dictionary<long, string>();
+        private static readonly Dictionary<long, string> _plainData = new Dictionary<long, string>();
         private static int _scanIndex;
+        private static int _programIndex;
+        private static bool _roundActive;
+        private static double _slowLogged;
         private static int _orderIndex;
         private static double _nextPlayers;
         private static double _scanStarted;
@@ -61,7 +67,9 @@ namespace Syntrix.AutoLcd
 
             public Action<IMyTerminalBlock> DataChanged;
 
-            /// <summary>CustomDataChanged came since the last detection (for the log line in Detect).</summary>
+            /// <summary>CustomDataChanged came since the last detection (for the log line in Detect). The game raises it
+            /// only on the other machines, never where the text was edited (single player, host), so the scan round
+            /// is the way that always works.</summary>
             public bool DataEvent;
         }
 
@@ -101,7 +109,7 @@ namespace Syntrix.AutoLcd
         public static void Start()
         {
             // Static fields survive loading another (or the same) world in the same game process, and
-            // ElapsedPlayTime starts again from the saved value: forget all times and counters of the last world.
+            // ElapsedPlayTime starts again at 0: forget all times and counters of the last world.
             ResetState();
             _running = true;
             _startTime = AutoLcdCore.Now;
@@ -138,6 +146,8 @@ namespace Syntrix.AutoLcd
             _entries.Clear();
             _programs.Clear();
             _contexts.Clear();
+            _plainProgram.Clear();
+            _plainData.Clear();
             _scan.Clear();
             _dirty.Clear();
             _constructs.Clear();
@@ -162,6 +172,12 @@ namespace Syntrix.AutoLcd
             _dirtyNow.Clear();
             _groupGrids.Clear();
             _dataLogged.Clear();
+            _programScan.Clear();
+            _plainProgram.Clear();
+            _plainData.Clear();
+            _programIndex = 0;
+            _roundActive = false;
+            _slowLogged = double.MinValue;
         }
 
         /// <summary>The game time went back (loaded save within the session): all due times start anew.</summary>
@@ -169,7 +185,10 @@ namespace Syntrix.AutoLcd
         {
             _nextPlayers = 0;
             _scanIndex = 0;
+            _programIndex = 0;
+            _roundActive = false;
             _scanStarted = double.MinValue;
+            _slowLogged = double.MinValue;
             _startTime = AutoLcdCore.Now;
             _dataLogged.Clear();
             foreach (var entry in _entries.Values)
@@ -285,6 +304,8 @@ namespace Syntrix.AutoLcd
                 program.CustomDataChanged -= OnProgramChanged;
                 _programs.Remove(block.EntityId);
                 _contexts.Remove(block.EntityId);
+                _plainProgram.Remove(block.EntityId);
+                _plainData.Remove(block.EntityId);
             }
             Entry entry;
             if (!_entries.TryGetValue(block.EntityId, out entry))
@@ -337,6 +358,8 @@ namespace Syntrix.AutoLcd
         /// <summary>Marks every block for a new detection (after settings or language changed).</summary>
         public static void DetectAll()
         {
+            _plainProgram.Clear();
+            _plainData.Clear();
             foreach (long id in _programs.Keys)
                 _dirty.Add(id);
             foreach (long id in _entries.Keys)
@@ -355,9 +378,33 @@ namespace Syntrix.AutoLcd
                 return;
             ScriptContext previous;
             _contexts.TryGetValue(program.EntityId, out previous);
+            string programText = null, customData = null;
+            if (previous == null && AutoLcdCore.Settings.ReadProgrammableBlocks)
+            {
+                // A programmable block without AutoLCD is read again only when its program or custom data changed:
+                // searching large scripts every round used up the budget before any screen came (round stood still).
+                try
+                {
+                    programText = program.ProgramData ?? "";
+                }
+                catch (Exception)
+                {
+                    programText = "";
+                }
+                customData = program.CustomData ?? "";
+                string seenProgram, seenData;
+                if (_plainProgram.TryGetValue(program.EntityId, out seenProgram) && _plainData.TryGetValue(program.EntityId, out seenData)
+                    && seenProgram == programText && seenData == customData)
+                    return;
+            }
             var context = AutoLcdCore.Settings.ReadProgrammableBlocks ? ScriptContext.Read(program, previous) : null;
             if (context == null)
             {
+                if (programText != null)
+                {
+                    _plainProgram[program.EntityId] = programText;
+                    _plainData[program.EntityId] = customData;
+                }
                 if (previous != null)
                 {
                     _contexts.Remove(program.EntityId);
@@ -666,27 +713,48 @@ namespace Syntrix.AutoLcd
                         Detect(entry);
                 }
             }
-            if (_scanIndex == 0 && now - _scanStarted < FullScanSeconds)
+            // The round is the only way to see Custom Data edited on this machine (no CustomDataChanged there).
+            // Programmable blocks and screens share the budget, and every tick does at least one step, so the
+            // round always gets through, however large the scripts or however full the budget.
+            if (!_roundActive && now - _scanStarted >= FullScanSeconds)
             {
-                // Round finished early; wait for the next one.
+                _roundActive = true;
+                _scanStarted = now;
+                _scanIndex = 0;
+                _programIndex = 0;
+                _programScan.Clear();
+                _programScan.AddRange(_programs.Keys);
             }
-            else
+            if (_roundActive)
             {
-                if (_scanIndex == 0)
+                bool stepped = false;
+                while (_programIndex < _programScan.Count && (!stepped || watch.ElapsedTicks <= detectBudget))
                 {
-                    _scanStarted = now;
-                    foreach (var program in _programs.Values)
+                    IMyProgrammableBlock program;
+                    if (_programs.TryGetValue(_programScan[_programIndex], out program))
                         DetectProgram(program);
+                    _programIndex++;
+                    stepped = true;
                 }
-                while (_scanIndex < _scan.Count && watch.ElapsedTicks <= detectBudget)
+                while (_scanIndex < _scan.Count && (!stepped || watch.ElapsedTicks <= detectBudget))
                 {
                     Entry entry;
                     if (_entries.TryGetValue(_scan[_scanIndex], out entry))
                         Detect(entry);
                     _scanIndex++;
+                    stepped = true;
                 }
-                if (_scanIndex >= _scan.Count)
-                    _scanIndex = 0;
+                if (_programIndex >= _programScan.Count && _scanIndex >= _scan.Count)
+                {
+                    _roundActive = false;
+                    double took = now - _scanStarted;
+                    if (took > 30 && now - _slowLogged > 300)
+                    {
+                        _slowLogged = now;
+                        AutoLcdCore.Log.Warn("scan round took " + took.ToString("0") + " s for " + _programScan.Count + " programmable blocks and "
+                            + _scan.Count + " blocks with screens (budget MaxMsPerTick " + AutoLcdCore.Settings.MaxMsPerTick + " ms)");
+                    }
+                }
             }
             if (_relink)
                 Relink();

@@ -36,7 +36,7 @@ namespace Syntrix.AutoLcd
 
         public static void Load()
         {
-            _nextLookup = 0;   // static: survives loading a world, ElapsedPlayTime starts again from the save
+            _nextLookup = 0;   // static: survives loading a world, ElapsedPlayTime starts again at 0
             MyAPIGateway.TerminalControls.CustomActionGetter += OnActions;
             if (!MyAPIGateway.Utilities.IsDedicated)
                 MyAPIGateway.TerminalControls.CustomControlGetter += OnControls;
