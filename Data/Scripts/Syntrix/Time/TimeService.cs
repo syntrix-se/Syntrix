@@ -27,8 +27,6 @@ namespace Syntrix.Time
     {
         /// <summary>File in the world storage of Syntrix.</summary>
         public const string FileName = "Syntrix-Time.xml";
-        /// <summary>Player machine: HUD values, MyTuple&lt;string key, object value&gt; (null value = none), only on change.</summary>
-        public const string HudEvent = "Syntrix.Time.Hud";
         /// <summary>Server: a new world day began, MyTuple&lt;int year, int day&gt;.</summary>
         public const string NewDayEvent = "Syntrix.Time.NewDay";
         /// <summary>Local time applies up to this multiple of the planet radius (orbits included).</summary>
@@ -550,7 +548,7 @@ namespace Syntrix.Time
 
         private void Hud(string key, object value)
         {
-            _core.Events.Publish(HudEvent, new MyTuple<string, object>(key, value));
+            _core.Hud.Set(key, value);   // shared HUD values (HudService), only changes go out
         }
 
         // ---------------------------------------------------------------- chat

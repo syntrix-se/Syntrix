@@ -246,6 +246,11 @@ namespace SyntrixExample
             // API 6: world clock and local time (all machines).
             _log.Info("world time " + _syx.TimeWorldText() + ", world day " + _syx.TimeWorldDays.ToString("0.00"));
 
+            // API 6: HUD values on the player's machine. Hand one to the HUD (any HUD mod shows keys it knows);
+            // the clock's values come from Syntrix itself.
+            if (_syx.IsPlayer)
+                _syx.HudSet("Example.WatchedDoors", 0);
+
             // API 6: on the server, a vanilla store closes for players whose goods level with its faction is below 1,
             // and every new world day is logged.
             if (_syx.IsServer)
