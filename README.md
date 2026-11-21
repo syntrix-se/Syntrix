@@ -41,6 +41,7 @@ Copy the dock files into your mod's script folder and do not edit them:
 | Accounts (API 6) | player and faction money with one check per frame, `Syntrix.Account.Changed` for every change |
 | Reputation gate and price (API 6) | lowest goods level per block type or block (also Vanilla blocks such as stores), price after the player's trade percent |
 | World clock (API 6) | one world date and local time of day for all mods, settings in the world storage, planet calendars, event controller events, script properties, AutoLCD commands, `/syxtime` |
+| HUD values (API 6) | a shared table of values on the player's machine: mods write keys (`Hover.Target`), displays such as a HUD mod read them; Syntrix keeps the last value, so a display that docks later still sees everything, and raises `Syntrix.Hud` on change; the world clock writes its values there too |
 | AutoLCD (1.5.0) | text screens filled without a programmable block, operated like Automatic LCDs 2 (inventory, cargo, power, blocks, gas, ship, text, time, reputation); mods add own commands through an event; settings in the world storage, `/syxlcd` |
 | Wiki | in-game wiki (F11, `/syxwiki`): every loaded mod adds pages with a `Data/Syntrix-Wiki.xml`, no code needed; mods with code add generated pages (`WikiAddSource`) and fill automatic tables (`WikiAddTables`) |
 
@@ -184,6 +185,11 @@ if (!_syx.AccountCharge(identityId, price, "MyMod.Repair"))
 string date = _syx.TimeWorldText();
 string local = _syx.TimeLocalText(position);
 _syx.Subscribe(SyntrixApi.TimeNewDayEvent, payload => OnNewDay());
+
+// player's machine: hand a value to the HUD, read one (clock values come from Syntrix itself)
+_syx.HudSet("MyMod.Speed", 12.5);
+double hour = _syx.HudNumber("Time.Local", -1);
+_syx.Subscribe(SyntrixApi.HudEvent, payload => { var kv = (MyTuple<string, object>)payload; });
 ```
 
 ### AutoLCD commands (1.5.0)

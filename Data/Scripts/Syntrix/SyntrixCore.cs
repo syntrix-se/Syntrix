@@ -80,6 +80,8 @@ namespace Syntrix
         public AccountService Accounts;
         /// <summary>World clock, local time, planet calendars (API 6, 1.5.0).</summary>
         public TimeService Time;
+        /// <summary>Shared HUD values on the player's machine (API 6, 1.5.0).</summary>
+        public HudService Hud;
 
         private readonly Dictionary<string, int> _docked = new Dictionary<string, int>();
         private string _instanceKey;
@@ -125,6 +127,7 @@ namespace Syntrix
             Sounds = new SoundService(this);
             Rep = new ReputationService(this);
             Accounts = new AccountService(this);
+            Hud = new HudService(this);
             Time = new TimeService(this);
             Net.Start();
             Blocks.Start();
@@ -164,6 +167,7 @@ namespace Syntrix
                 Rep.Stop();
                 Accounts.Stop();
                 Time.Stop();
+                Hud.Stop();
                 TimeControls.Unload();
                 Watch.Stop();
                 Gui.Stop();
@@ -415,6 +419,9 @@ namespace Syntrix
             d["Time.LocalText"] = new Func<Vector3D, bool, string>(Time.LocalText);
             d["Time.Calendar"] = new Func<Vector3D, MyTuple<string, string>>(Time.CalendarAt);
             d["Time.IsNight"] = new Func<Vector3D, bool>(Time.IsNight);
+            d["Hud.Set"] = new Action<string, object>(Hud.Set);
+            d["Hud.Get"] = new Func<string, object>(Hud.Get);
+            d["Hud.Keys"] = new Func<string[]>(Hud.Keys);
 
             // Wiki (API 3)
             d["Wiki.Open"] = new Func<string, bool>(Wiki.Open);

@@ -286,6 +286,9 @@ namespace Syntrix.Api
         private Func<VRageMath.Vector3D, bool, string> _timeLocalText;
         private Func<VRageMath.Vector3D, MyTuple<string, string>> _timeCalendar;
         private Func<VRageMath.Vector3D, bool> _timeIsNight;
+        private Action<string, object> _hudSet;
+        private Func<string, object> _hudGet;
+        private Func<string[]> _hudKeys;
 
         private void Bind()
         {
@@ -379,6 +382,9 @@ namespace Syntrix.Api
             _timeLocalText = Get<Func<VRageMath.Vector3D, bool, string>>("Time.LocalText");
             _timeCalendar = Get<Func<VRageMath.Vector3D, MyTuple<string, string>>>("Time.Calendar");
             _timeIsNight = Get<Func<VRageMath.Vector3D, bool>>("Time.IsNight");
+            _hudSet = Get<Action<string, object>>("Hud.Set");
+            _hudGet = Get<Func<string, object>>("Hud.Get");
+            _hudKeys = Get<Func<string[]>>("Hud.Keys");
         }
 
         // ---------- info ----------
@@ -991,8 +997,6 @@ namespace Syntrix.Api
 
         // ---------- world clock (API 6, Syntrix 1.5.0) ----------
 
-        /// <summary>API 6. Event on the player's machine: HUD values of the clock, MyTuple&lt;string key, object value&gt;, only on change.</summary>
-        public const string TimeHudEvent = "Syntrix.Time.Hud";
         /// <summary>API 6. Event on the server: a new world day began, MyTuple&lt;int year, int day&gt;.</summary>
         public const string TimeNewDayEvent = "Syntrix.Time.NewDay";
 
@@ -1028,6 +1032,35 @@ namespace Syntrix.Api
         /// <summary>API 6. Night at a place by sun height (false without local time).</summary>
         /// <param name="position">Place in world coordinates.</param>
         public bool TimeIsNight(VRageMath.Vector3D position) { return _timeIsNight != null && _timeIsNight(position); }
+
+        // ---------- HUD values (API 6, Syntrix 1.5.0, players only) ----------
+
+        /// <summary>API 6. Event on the player's machine when a HUD value changed: MyTuple&lt;string key, object value&gt;
+        /// (value double or string, null = removed).</summary>
+        public const string HudEvent = "Syntrix.Hud";
+
+        /// <summary>API 6. Hands a value to the HUD and other displays on the player's machine. Key with mod prefix
+        /// ("MyMod.Speed"); value double (int, float, bool are turned into double), string, or null to remove it.
+        /// Syntrix keeps the last value, so send only on change. Does nothing on a dedicated server.
+        /// Clock values come from Syntrix itself: Time.Local, Time.Night, Time.SunHeight, Time.WorldYear,
+        /// Time.WorldDay, Time.WorldHour, Time.Calendar, Time.CalendarDate.</summary>
+        public void HudSet(string key, object value) { if (_hudSet != null) _hudSet(key, value); }
+
+        /// <summary>API 6. Current HUD value of a key (double or string), null when there is none.</summary>
+        public object HudGet(string key) { return _hudGet != null ? _hudGet(key) : null; }
+
+        /// <summary>API 6. HUD value as a number; fallback when there is none or it is text.</summary>
+        public double HudNumber(string key, double fallback = 0)
+        {
+            object v = HudGet(key);
+            return v is double ? (double)v : fallback;
+        }
+
+        /// <summary>API 6. HUD value as text, null when there is none or it is a number.</summary>
+        public string HudText(string key) { return HudGet(key) as string; }
+
+        /// <summary>API 6. All keys that have a HUD value right now (e.g. to fill a display after docking).</summary>
+        public string[] HudKeys() { return _hudKeys != null ? _hudKeys() : new string[0]; }
 
         // ---------- helpers without endpoint (1.3.0) ----------
 

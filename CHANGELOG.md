@@ -46,11 +46,20 @@ to use accounts, the reputation gate and price, and the world clock.
 - Endpoints `Time.Utc`, `Time.WorldDays`, `Time.WorldDate`, `Time.WorldText`, `Time.Local`,
   `Time.LocalText`, `Time.Calendar`, `Time.IsNight`; dock file `TimeUtc`, `TimeWorldDays`,
   `TimeWorldDate`, `TimeWorldText`, `TimeLocal`, `TimeLocalText`, `TimeCalendar`, `TimeIsNight`.
-- Events `Syntrix.Time.NewDay` (server) and `Syntrix.Time.Hud` (player, HUD values); constants
-  `TimeNewDayEvent`, `TimeHudEvent`.
+- Event `Syntrix.Time.NewDay` (server); constant `TimeNewDayEvent`. The clock's HUD values (`Time.Local`,
+  `Time.Night`, `Time.SunHeight`, `Time.WorldYear`, `Time.WorldDay`, `Time.WorldHour`, `Time.Calendar`,
+  `Time.CalendarDate`) go into the HUD values below.
 - Event controller events "time of day" and "day/night", programmable block properties `Syx.LocalTime`,
   `Syx.Night`, `Syx.SunHeight`, `Syx.WorldTime`, `Syx.WorldYear`, `Syx.WorldDay`, `Syx.WorldHour`,
   `Syx.Calendar`; AutoLCD commands `WorldTime` and `LocalTime`; chat command `/syxtime`.
+
+### HUD values
+
+- A shared table of values on the player's machine. Mods write keys with their prefix, displays (a HUD mod,
+  AutoLCD commands) read them. Values are double or string, null removes a key. Syntrix keeps the last value
+  of every key, so a display that docks later still sees everything sent before.
+- Endpoints `Hud.Set`, `Hud.Get`, `Hud.Keys`; event `Syntrix.Hud` (`MyTuple<string, object>`) on change.
+  Dock file: `HudSet`, `HudGet`, `HudNumber`, `HudText`, `HudKeys`, constant `HudEvent`.
 
 ### AutoLCD
 
