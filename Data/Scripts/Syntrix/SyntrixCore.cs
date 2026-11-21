@@ -124,7 +124,7 @@ namespace Syntrix
             Watch = new BlockWatch();
             Grids = new GridStore(this);
             Screens = new ScreenService(this, Watch);
-            AdminBlocks = new AdminBlocks(this, Watch);
+            AdminBlocks = new AdminBlocks(this);
             Prices = new PriceService();
             Lights = new LightService(this);
             Sounds = new SoundService(this);
