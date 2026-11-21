@@ -435,14 +435,14 @@ namespace Syntrix.Supply
             return added;
         }
 
-        private static void FillWeaponsFromSources(Watch w, Profile p)
+        private void FillWeaponsFromSources(Watch w, Profile p)
         {
             int target = p.WeaponMagazines;
             foreach (var weapon in w.Weapons)
             {
                 if (weapon.MarkedForClose || !weapon.IsFunctional)
                     continue;
-                var magazines = MagazinesOf(w, weapon);
+                var magazines = MagazinesOf(weapon);
                 var inventory = weapon.GetInventory(0);
                 if (magazines == null || inventory == null)
                     continue;
@@ -504,7 +504,7 @@ namespace Syntrix.Supply
             {
                 if (weapon.MarkedForClose || !weapon.IsFunctional)
                     continue;
-                var magazines = MagazinesOf(w, weapon);
+                var magazines = MagazinesOf(weapon);
                 var inventory = weapon.GetInventory(0);
                 if (magazines == null || inventory == null)
                     continue;
@@ -526,7 +526,7 @@ namespace Syntrix.Supply
 
         // ---------- shared ----------
 
-        private MyDefinitionId[] MagazinesOf(Watch w, IMyTerminalBlock weapon)
+        private MyDefinitionId[] MagazinesOf(IMyTerminalBlock weapon)
         {
             var magazines = Magazines(weapon);
             return magazines.Length > 0 ? magazines : null;
