@@ -90,6 +90,8 @@ to use accounts, the reputation gate and price, and the world clock.
   `DisplayName` and `AvailableInSurvival`, because the first category of a Name that loads keeps its settings.
 - Admin only blocks: a block that the game reaches as a variant of another block (block variant group) stays
   hidden in the G menu for admins too, so a group of admin only blocks shows as one entry.
+- Admin only blocks: on a player machine `Public` now follows the admin rank as well, so players without
+  admin rank no longer find the blocks in the G menu search. A dedicated server keeps `Public` on.
 
 ## 1.4.1 (API version 5)
 
