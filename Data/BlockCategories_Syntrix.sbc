@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <!-- G menu category "NPC" for blocks of NPC stations and NPC ships. In survival the game shows it to admins only
+       (AvailableInSurvival false). Other mods add their blocks under the same Name. Categories with the same Name are
+       merged by load order and the first one keeps its settings, so every mod repeats DisplayName and
+       AvailableInSurvival exactly as here; then the order does not matter. -->
+  <CategoryClasses>
+    <Category xsi:type="MyObjectBuilder_GuiBlockCategoryDefinition">
+      <Id>
+        <TypeId>GuiBlockCategoryDefinition</TypeId>
+        <SubtypeId />
+      </Id>
+      <DisplayName>NPC</DisplayName>
+      <AvailableInSurvival>false</AvailableInSurvival>
+      <Name>SyxNpc</Name>
+      <ItemIds />
+    </Category>
+  </CategoryClasses>
+</Definitions>

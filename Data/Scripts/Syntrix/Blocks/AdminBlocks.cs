@@ -15,6 +15,8 @@ namespace Syntrix.Blocks
     /// - Server: a block of such a type that a player without admin rank starts to build or welds from a projection is
     ///   razed again, the player gets the mod's notice. Blocks placed finished (creative tools, prefabs, pasted grids)
     ///   and blocks of NPCs stay.
+    /// - Block variant groups: the game shows only the first block of a group and reaches the others as variants
+    ///   (BlockStages). Such variant blocks stay hidden for admins too, so the group shows as one entry.
     /// </summary>
     public sealed class AdminBlocks
     {
@@ -24,12 +26,14 @@ namespace Syntrix.Blocks
             public string Notice;
             public string Fallback;
             public MyCubeBlockDefinition Definition;
+            public bool Variant;
         }
 
         private readonly SyntrixCore _core;
         private readonly BlockWatch _watch;
         private readonly Dictionary<string, Entry> _entries = new Dictionary<string, Entry>();
         private readonly List<IMySlimBlock> _raze = new List<IMySlimBlock>();
+        private HashSet<MyDefinitionId> _variants;
         private bool _watching, _visible;
         private int _tick;
 
@@ -60,9 +64,10 @@ namespace Syntrix.Blocks
             Entry old;
             if (_entries.TryGetValue(blockKey, out old) && old.Mod != mod)
                 Log.Warn("Admin block " + blockKey + " taken over by " + mod + " from " + old.Mod);
+            bool variant = IsVariant(definition);
             definition.Public = true;
-            definition.GuiVisible = _core.IsPlayer && _visible;
-            _entries[blockKey] = new Entry { Mod = mod, Notice = noticeKey, Fallback = fallback, Definition = definition };
+            definition.GuiVisible = _core.IsPlayer && _visible && !variant;
+            _entries[blockKey] = new Entry { Mod = mod, Notice = noticeKey, Fallback = fallback, Definition = definition, Variant = variant };
             if (_core.IsServer && !_watching)
             {
                 _watching = true;
@@ -77,7 +82,7 @@ namespace Syntrix.Blocks
             Entry old;
             if (!_entries.TryGetValue(blockKey, out old) || old.Mod != mod)
                 return;
-            old.Definition.GuiVisible = true;
+            old.Definition.GuiVisible = !old.Variant;
             _entries.Remove(blockKey);
         }
 
@@ -97,9 +102,29 @@ namespace Syntrix.Blocks
         public void Stop()
         {
             foreach (var e in _entries.Values)
-                e.Definition.GuiVisible = true;
+                e.Definition.GuiVisible = !e.Variant;
             _entries.Clear();
             _raze.Clear();
+            _variants = null;
+        }
+
+        /// <summary>True if the block is reached as a variant of another block (BlockStages, set by the game for
+        /// block variant groups); the game hides such blocks in the G menu.</summary>
+        private bool IsVariant(MyCubeBlockDefinition definition)
+        {
+            if (_variants == null)
+            {
+                _variants = new HashSet<MyDefinitionId>();
+                foreach (var d in MyDefinitionManager.Static.GetAllDefinitions())
+                {
+                    var block = d as MyCubeBlockDefinition;
+                    if (block == null || block.BlockStages == null)
+                        continue;
+                    foreach (var stage in block.BlockStages)
+                        _variants.Add(stage);
+                }
+            }
+            return _variants.Contains(definition.Id);
         }
 
         private void UpdateVisibility(bool force)
@@ -111,7 +136,7 @@ namespace Syntrix.Blocks
                 return;
             _visible = admin;
             foreach (var e in _entries.Values)
-                e.Definition.GuiVisible = admin;
+                e.Definition.GuiVisible = admin && !e.Variant;
         }
 
         private void Added(IMySlimBlock block)
