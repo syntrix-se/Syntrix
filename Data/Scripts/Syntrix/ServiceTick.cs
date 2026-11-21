@@ -19,10 +19,14 @@ namespace Syntrix
                 core.AdminBlocks.Tick();
                 core.Lights.Tick();
                 core.Rep.Tick();
+                core.Accounts.Tick();
+                core.Time.Tick();
+                core.Supply.Tick();
                 if (core.IsPlayer)
                 {
                     core.Screens.Tick();
                     core.Sounds.Tick();
+                    core.Rep.GateTick();
                 }
             }
             catch (Exception e)

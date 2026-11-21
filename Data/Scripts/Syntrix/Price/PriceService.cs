@@ -6,7 +6,7 @@ using System.Collections.Generic;
 namespace Syntrix.Price
 {
     /// <summary>
-    /// Price requests (API 4). One mod registers as price giver for a service name (e.g. "Hangar.Store"); other mods ask
+    /// Price requests (API 4). One mod registers as price giver for a service name (e.g. "Npc.Repair"); other mods ask
     /// with a description of the service and get an amount. Without a price giver, or when the giver has no price, the
     /// answer is -1 ("no price") and the asking mod uses its own fallback. Runs where it is called (usually the server).
     /// The description is plain text, one "key=value" per line; the keys are agreed between the mods (see README).
@@ -58,6 +58,16 @@ namespace Syntrix.Price
                 Log.Error("price giver " + e.Mod + " for " + service + " (asked by " + mod + ")", ex);
                 return -1;
             }
+        }
+
+        /// <summary>Event raised where <see cref="Changed"/> is called (usually the server); payload: the service name.</summary>
+        public const string ChangedEvent = "Syntrix.Price.Changed";
+
+        /// <summary>API 6: a price giver tells the askers that its prices of a service changed (they ask again).</summary>
+        public void Changed(SyntrixCore core, string service)
+        {
+            if (!string.IsNullOrEmpty(service))
+                core.Events.Publish(ChangedEvent, service);
         }
 
         /// <summary>Forgets all price givers.</summary>

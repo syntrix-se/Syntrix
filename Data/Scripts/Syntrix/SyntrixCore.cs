@@ -7,6 +7,7 @@ using VRage;
 using VRage.Game;
 using VRage.Game.Components;
 using VRage.Game.ModAPI;
+using Syntrix.Account;
 using Syntrix.Blocks;
 using Syntrix.Effects;
 using Syntrix.Grids;
@@ -14,6 +15,8 @@ using Syntrix.Gui;
 using Syntrix.Price;
 using Syntrix.Reputation;
 using Syntrix.Screens;
+using Syntrix.Supply;
+using Syntrix.Time;
 using Syntrix.Use;
 using Syntrix.Wiki;
 using VRage.Utils;
@@ -74,6 +77,14 @@ namespace Syntrix
         public SoundService Sounds;
         /// <summary>Reputation of players with factions (API 5, 1.4.0).</summary>
         public ReputationService Rep;
+        /// <summary>Money of players and factions (API 6, 1.5.0).</summary>
+        public AccountService Accounts;
+        /// <summary>World clock, local time, planet calendars (API 6, 1.5.0).</summary>
+        public TimeService Time;
+        /// <summary>Shared HUD values on the player's machine (API 6, 1.5.0).</summary>
+        public HudService Hud;
+        /// <summary>Supply of grid groups with fuel and ammo (API 6, 1.5.0).</summary>
+        public SupplyService Supply;
 
         private readonly Dictionary<string, int> _docked = new Dictionary<string, int>();
         private string _instanceKey;
@@ -113,11 +124,15 @@ namespace Syntrix
             Watch = new BlockWatch();
             Grids = new GridStore(this);
             Screens = new ScreenService(this, Watch);
-            AdminBlocks = new AdminBlocks(this, Watch);
+            AdminBlocks = new AdminBlocks(this);
             Prices = new PriceService();
             Lights = new LightService(this);
             Sounds = new SoundService(this);
             Rep = new ReputationService(this);
+            Accounts = new AccountService(this);
+            Hud = new HudService(this);
+            Time = new TimeService(this);
+            Supply = new SupplyService(this);
             Net.Start();
             Blocks.Start();
             Chat.Start();
@@ -125,6 +140,7 @@ namespace Syntrix
             Wiki.Start();
             Lights.Start();
             Rep.Start();
+            Time.Start();
             Chat.Register("Syntrix", "syxrep", (int)MyPromoteLevel.Admin, true, "reputation of players (/syxrep list|set|add|reset)", Rep.OnChat);
             Started = true;
 
@@ -136,7 +152,10 @@ namespace Syntrix
         public override void SaveData()
         {
             if (Started)
+            {
                 Rep.Save();
+                Supply.Save();
+            }
         }
 
         /// <summary>Stops the services.</summary>
@@ -153,6 +172,11 @@ namespace Syntrix
                 Lights.Stop();
                 Sounds.Stop();
                 Rep.Stop();
+                Accounts.Stop();
+                Time.Stop();
+                Hud.Stop();
+                Supply.Stop();
+                TimeControls.Unload();
                 Watch.Stop();
                 Gui.Stop();
                 Use.Stop();
@@ -382,6 +406,35 @@ namespace Syntrix
             d["Rep.Change"] = new Func<long, string, int, string, int, int>(Rep.Change);
             d["Rep.Set"] = new Action<long, string, int, string>(Rep.Set);
             d["Rep.ResetStart"] = new Action<long>(Rep.ResetStart);
+
+            // API 6 (1.5.0): reputation gate and prices, accounts, price changes, world clock
+            d["Rep.Price"] = new Func<long, string, long, bool, long>(Rep.Price);
+            d["Rep.Refuses"] = new Func<long, long, bool>(Rep.RefusesById);
+            d["Rep.GateType"] = new Action<string, int>(Rep.GateType);
+            d["Rep.GateBlock"] = new Action<long, int>(Rep.GateBlock);
+            d["Rep.MinGoods"] = new Func<long, int>(id => Rep.MinGoods(MyAPIGateway.Entities.GetEntityById(id) as IMyCubeBlock));
+            d["Account.Balance"] = new Func<long, long>(Accounts.Balance);
+            d["Account.Charge"] = new Func<long, long, string, bool>(Accounts.Charge);
+            d["Account.Pay"] = new Func<long, long, string, bool>(Accounts.Pay);
+            d["Account.FactionBalance"] = new Func<string, long>(Accounts.FactionBalance);
+            d["Account.FactionChange"] = new Func<string, long, string, bool>(Accounts.FactionChange);
+            d["Price.Changed"] = new Action<string>(service => Prices.Changed(this, service));
+            d["Time.Utc"] = new Func<long>(() => Time.Utc.Ticks);
+            d["Time.WorldDays"] = new Func<double>(() => Time.WorldDays);
+            d["Time.WorldDate"] = new Func<MyTuple<int, int, double>>(Time.WorldDate);
+            d["Time.WorldText"] = new Func<bool, string>(Time.WorldText);
+            d["Time.Local"] = new Func<Vector3D, MyTuple<bool, double, float, bool>>(Time.Local);
+            d["Time.LocalText"] = new Func<Vector3D, bool, string>(Time.LocalText);
+            d["Time.Calendar"] = new Func<Vector3D, MyTuple<string, string>>(Time.CalendarAt);
+            d["Time.IsNight"] = new Func<Vector3D, bool>(Time.IsNight);
+            d["Hud.Set"] = new Action<string, object>(Hud.Set);
+            d["Hud.Get"] = new Func<string, object>(Hud.Get);
+            d["Hud.Keys"] = new Func<string[]>(Hud.Keys);
+            d["Supply.Profile"] = new Action<string, string>((name, settings) => Supply.DefineProfile(modName, name, settings));
+            d["Supply.RegisterSource"] = new Action<string>(block => Supply.RegisterSource(modName, block));
+            d["Supply.Watch"] = new Action<long, string>(Supply.StartWatch);
+            d["Supply.Unwatch"] = new Action<long>(Supply.Unwatch);
+            d["Supply.IsWatched"] = new Func<long, bool>(Supply.IsWatched);
 
             // Wiki (API 3)
             d["Wiki.Open"] = new Func<string, bool>(Wiki.Open);

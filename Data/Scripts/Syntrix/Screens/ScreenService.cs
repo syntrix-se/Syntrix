@@ -18,11 +18,12 @@ namespace Syntrix.Screens
     /// <summary>
     /// Fixed screens (API 4, players only). A mod registers a block type and a screen index with a content function;
     /// Syntrix asks it about every 100 frames for each such block within 150 m of the camera and draws the lines in one
-    /// board style, only when the content changed (or someone changed the screen). The screen settings of these blocks
-    /// are removed from the K menu.
+    /// board style, only when the content changed (or someone changed the screen). The screen settings leave the K menu
+    /// of the blocks whose content is not empty (1.5.0: before, of every block of the type).
     /// Content: lines separated by "\n", each "kind\ttext"; the title takes "T\tsymbol\ttext" (symbol = LCD texture,
     /// may be empty). Kinds: A alarm bar, T title, N name, S small, V value, H hint, F foot (bottom line), G gap.
     /// "{F}" in a text is replaced by the key of the use control. Null or "" leaves the screen as it is.
+    /// The board scales with the screen width and, since 1.5.0, shrinks further until all lines fit the height.
     /// </summary>
     public sealed class ScreenService
     {
@@ -189,9 +190,24 @@ namespace Syntrix.Screens
 
         private void HideScreenControls(IMyTerminalBlock block, List<IMyTerminalControl> controls)
         {
-            if (block == null || !_types.Contains(UseKey(block)))
+            if (block == null)
                 return;
-            controls.RemoveAll(c => c != null && ScreenControls.Contains(c.Id));
+            string type = UseKey(block);
+            if (!_types.Contains(type))
+                return;
+            // only blocks that show a board lose their screen settings; the others of the type keep them
+            bool drawn = false;
+            foreach (var pair in _entries)
+            {
+                if (!pair.Key.StartsWith(type + "|", StringComparison.Ordinal))
+                    continue;
+                try { drawn = !string.IsNullOrEmpty(pair.Value.Content(block.EntityId)); }
+                catch (Exception e) { Log.Error("screen content of " + pair.Value.Mod, e); }
+                if (drawn)
+                    break;
+            }
+            if (drawn)
+                controls.RemoveAll(c => c != null && ScreenControls.Contains(c.Id));
         }
 
         private void Update(IMyTerminalBlock block, IngameSurface surface, int index, Entry e)
@@ -264,56 +280,81 @@ namespace Syntrix.Screens
             surface.ScriptBackgroundColor = Background;
             var view = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 2f, surface.SurfaceSize);
             float k = view.Width / 320f;          // reference width 320
+            // 1.5.0: shrink until the lines fit the height (wide, low screens such as the store block); wrapping changes
+            // with the scale, so measure again after each step
+            bool foot = false;
+            foreach (var line in lines)
+                foot |= line.Kind == 'F';
+            for (int i = 0; i < 8; i++)
+            {
+                float room = view.Height - (foot ? 52f * k : 10f * k);
+                float used = Layout(null, surface, view, lines, k) - view.Y;
+                if (used <= room)
+                    break;
+                k *= Math.Max(0.5f, room / used * 0.98f);
+            }
+            using (var frame = surface.DrawFrame())
+                Layout(frame, surface, view, lines, k);
+        }
+
+        /// <summary>Lays out the lines at scale k; adds the sprites when frame is given, else only measures. Returns the
+        /// bottom of the text (without the foot line).</summary>
+        private static float Layout(MySpriteDrawFrame? frame, IngameSurface surface, RectangleF view, List<Line> lines, float k)
+        {
             float margin = 18f * k;
             float width = view.Width - 2f * margin;
             float y = view.Y + 14f * k;
-            using (var frame = surface.DrawFrame())
+            foreach (var line in lines)
             {
-                foreach (var line in lines)
+                switch (line.Kind)
                 {
-                    switch (line.Kind)
-                    {
-                        case 'A':
-                            float h = Wrap(surface, line.Text, 0.62f * k, width - 12f * k).Count * 22f * k + 12f * k;
-                            frame.Add(Box(new Vector2(view.X, y), new Vector2(view.Width, h), AlarmColor));
-                            y = Paragraph(frame, surface, line.Text, new Vector2(view.X + margin, y + 6f * k), 0.62f * k, width, Color.White, 22f * k) + 12f * k;
-                            break;
-                        case 'T':
-                            float s = 44f * k;
-                            float x = view.X + margin;
-                            if (!string.IsNullOrEmpty(line.Symbol))
-                            {
-                                frame.Add(new MySprite(SpriteType.TEXTURE, line.Symbol, new Vector2(x + s / 2f, y + s / 2f), new Vector2(s, s), Color.White));
-                                x += s + 10f * k;
-                            }
-                            frame.Add(new MySprite(SpriteType.TEXT, line.Text, new Vector2(x, y + 6f * k), null, Accent, "White", TextAlignment.LEFT, 1.0f * k));
-                            y += s + 6f * k;
-                            frame.Add(Box(new Vector2(view.X + margin, y), new Vector2(width, 2f * k), Accent));
-                            y += 10f * k;
-                            break;
-                        case 'N':
-                            y = Paragraph(frame, surface, line.Text, new Vector2(view.X + margin, y), 0.8f * k, width, Text, 27f * k);
-                            break;
-                        case 'S':
-                            y = Paragraph(frame, surface, line.Text, new Vector2(view.X + margin, y), 0.6f * k, width, Quiet, 21f * k);
-                            break;
-                        case 'V':
-                            y = Paragraph(frame, surface, line.Text, new Vector2(view.X + margin, y), 0.75f * k, width, Text, 26f * k);
-                            break;
-                        case 'H':
-                            y = Paragraph(frame, surface, "• " + line.Text, new Vector2(view.X + margin, y), 0.6f * k, width, Text, 21f * k) + 4f * k;
-                            break;
-                        case 'F':
-                            float fy = view.Y + view.Height - 40f * k;
-                            frame.Add(Box(new Vector2(view.X + margin, fy - 8f * k), new Vector2(width, 2f * k), Accent));
-                            frame.Add(new MySprite(SpriteType.TEXT, line.Text, new Vector2(view.X + view.Width / 2f, fy), null, Accent, "White", TextAlignment.CENTER, 0.75f * k));
-                            break;
-                        default:
-                            y += 12f * k;
-                            break;
-                    }
+                    case 'A':
+                        float h = Wrap(surface, line.Text, 0.62f * k, width - 12f * k).Count * 22f * k + 12f * k;
+                        Add(frame, Box(new Vector2(view.X, y), new Vector2(view.Width, h), AlarmColor));
+                        y = Paragraph(frame, surface, line.Text, new Vector2(view.X + margin, y + 6f * k), 0.62f * k, width, Color.White, 22f * k) + 12f * k;
+                        break;
+                    case 'T':
+                        float s = 44f * k;
+                        float x = view.X + margin;
+                        if (!string.IsNullOrEmpty(line.Symbol))
+                        {
+                            Add(frame, new MySprite(SpriteType.TEXTURE, line.Symbol, new Vector2(x + s / 2f, y + s / 2f), new Vector2(s, s), Color.White));
+                            x += s + 10f * k;
+                        }
+                        Add(frame, new MySprite(SpriteType.TEXT, line.Text, new Vector2(x, y + 6f * k), null, Accent, "White", TextAlignment.LEFT, 1.0f * k));
+                        y += s + 6f * k;
+                        Add(frame, Box(new Vector2(view.X + margin, y), new Vector2(width, 2f * k), Accent));
+                        y += 10f * k;
+                        break;
+                    case 'N':
+                        y = Paragraph(frame, surface, line.Text, new Vector2(view.X + margin, y), 0.8f * k, width, Text, 27f * k);
+                        break;
+                    case 'S':
+                        y = Paragraph(frame, surface, line.Text, new Vector2(view.X + margin, y), 0.6f * k, width, Quiet, 21f * k);
+                        break;
+                    case 'V':
+                        y = Paragraph(frame, surface, line.Text, new Vector2(view.X + margin, y), 0.75f * k, width, Text, 26f * k);
+                        break;
+                    case 'H':
+                        y = Paragraph(frame, surface, "• " + line.Text, new Vector2(view.X + margin, y), 0.6f * k, width, Text, 21f * k) + 4f * k;
+                        break;
+                    case 'F':
+                        float fy = view.Y + view.Height - 40f * k;
+                        Add(frame, Box(new Vector2(view.X + margin, fy - 8f * k), new Vector2(width, 2f * k), Accent));
+                        Add(frame, new MySprite(SpriteType.TEXT, line.Text, new Vector2(view.X + view.Width / 2f, fy), null, Accent, "White", TextAlignment.CENTER, 0.75f * k));
+                        break;
+                    default:
+                        y += 12f * k;
+                        break;
                 }
             }
+            return y;
+        }
+
+        private static void Add(MySpriteDrawFrame? frame, MySprite sprite)
+        {
+            if (frame.HasValue)
+                frame.Value.Add(sprite);
         }
 
         private static MySprite Box(Vector2 topLeft, Vector2 size, Color color)
@@ -321,12 +362,12 @@ namespace Syntrix.Screens
             return new MySprite(SpriteType.TEXTURE, "SquareSimple", topLeft + size / 2f, size, color);
         }
 
-        private static float Paragraph(MySpriteDrawFrame frame, IngameSurface surface, string text, Vector2 at, float scale, float width,
+        private static float Paragraph(MySpriteDrawFrame? frame, IngameSurface surface, string text, Vector2 at, float scale, float width,
             Color color, float lineHeight)
         {
             foreach (var row in Wrap(surface, text, scale, width))
             {
-                frame.Add(new MySprite(SpriteType.TEXT, row, at, null, color, "White", TextAlignment.LEFT, scale));
+                Add(frame, new MySprite(SpriteType.TEXT, row, at, null, color, "White", TextAlignment.LEFT, scale));
                 at.Y += lineHeight;
             }
             return at.Y;

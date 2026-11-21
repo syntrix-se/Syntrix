@@ -1,5 +1,112 @@
 # Changelog
 
+## 1.5.0 (API version 6)
+
+Dock files of API versions 1 to 5 keep working; no endpoint was removed. Copy the new `Api/SyntrixApi.cs`
+to use accounts, the reputation gate and price, and the world clock.
+
+### Accounts
+
+- `Account.Balance`, `Account.Charge`, `Account.Pay` for player money (balance -1 while the player is
+  offline; charges and payments of the same frame are counted together, so two charges cannot both pass),
+  `Account.FactionBalance`, `Account.FactionChange` for faction accounts.
+- Event `Syntrix.Account.Changed` (identity, faction tag, delta, reason) on the server.
+- Dock file: `AccountBalance`, `AccountCharge`, `AccountPay`, `AccountFactionBalance`,
+  `AccountFactionChange`, constant `AccountChangedEvent`.
+
+### Reputation gate and price
+
+- `Rep.Price` applies the trade percent of the player's tier to a price (player buys: lower, player
+  sells: higher).
+- `Rep.GateType` and `Rep.GateBlock` give block types or single blocks a lowest goods level; the gate of
+  1.4.1 now also closes the terminal (K) at such blocks without the use object `SyntrixUse`. The F screen of a
+  Vanilla store is no terminal and no mod can close it, so a gated store takes the use object `SyntrixUse`.
+  A block with `SyntrixUse` and no registered F action keeps its Vanilla use points (store, the buttons of
+  vending machines, conveyor ports): Syntrix hands every action on to the game's own use object of that
+  detector, but only after the gate let the player through. `Rep.Refuses` and
+  `Rep.MinGoods` ask for it.
+- Dock file: `RepPrice`, `RepRefuses`, `RepGateType`, `RepGateBlock`, `RepMinGoods`.
+
+### Prices
+
+- `Price.Changed` raises `Syntrix.Price.Changed` (service name) when a price giver changes its prices.
+  Dock file: `PriceChanged`, constant `PriceChangedEvent`.
+
+### Fixed screens
+
+- The screen settings leave the K menu only at blocks whose content function returns a text; other blocks of the
+  same type (a player's store next to an NPC store, for example) keep them.
+
+### World clock
+
+- One world clock for all mods: start date, time factor, year length and planet calendars in the world
+  storage (`Syntrix-Time.xml`, written with defaults by the server). Players get the server's clock and
+  settings (packet kinds 16 and 17).
+- Local time of day from the sun position at a place, optional sun alignment and sky rotation.
+- Endpoints `Time.Utc`, `Time.WorldDays`, `Time.WorldDate`, `Time.WorldText`, `Time.Local`,
+  `Time.LocalText`, `Time.Calendar`, `Time.IsNight`; dock file `TimeUtc`, `TimeWorldDays`,
+  `TimeWorldDate`, `TimeWorldText`, `TimeLocal`, `TimeLocalText`, `TimeCalendar`, `TimeIsNight`.
+- Event `Syntrix.Time.NewDay` (server); constant `TimeNewDayEvent`. The clock's HUD values (`Time.Local`,
+  `Time.Night`, `Time.SunHeight`, `Time.WorldYear`, `Time.WorldDay`, `Time.WorldHour`, `Time.Calendar`,
+  `Time.CalendarDate`) go into the HUD values below.
+- Event controller events "time of day" and "day/night", programmable block properties `Syx.LocalTime`,
+  `Syx.Night`, `Syx.SunHeight`, `Syx.WorldTime`, `Syx.WorldYear`, `Syx.WorldDay`, `Syx.WorldHour`,
+  `Syx.Calendar`; AutoLCD commands `WorldTime` and `LocalTime`; chat command `/syxtime`.
+
+### HUD values
+
+- A shared table of values on the player's machine. Mods write keys with their prefix, displays (a HUD mod,
+  AutoLCD commands) read them. Values are double or string, null removes a key. Syntrix keeps the last value
+  of every key, so a display that docks later still sees everything sent before.
+- Endpoints `Hud.Set`, `Hud.Get`, `Hud.Keys`; event `Syntrix.Hud` (`MyTuple<string, object>`) on change.
+  Dock file: `HudSet`, `HudGet`, `HudNumber`, `HudText`, `HudKeys`, constant `HudEvent`.
+
+### Supply
+
+- Keeps a grid group supplied (server): reactors on and topped up with their item fuel, weapons loaded with the
+  magazines of their weapon definition, out of nothing and without conveyors. The stock per group (target per weapon,
+  filled once, then refilled slowly) lies in source blocks registered by any mod and is loot there; groups without
+  such a block keep an invisible stock, saved in `Syntrix-Supply.txt` in the world storage. Named profiles with
+  `CheckSeconds`, `NpcOnly`, `Reactors`, `ReactorFuel`, `WeaponMagazines`, `StockPerWeapon`, `RefillSeconds`,
+  `RefillPerWeapon`.
+- Endpoints `Supply.Profile`, `Supply.RegisterSource`, `Supply.Watch`, `Supply.Unwatch`, `Supply.IsWatched`.
+  Dock file: `SupplyProfile`, `SupplyLine`, `SupplyRegisterSource`, `SupplyWatch`, `SupplyUnwatch`,
+  `SupplyIsWatched`.
+
+### AutoLCD
+
+- Syntrix AutoLCD is now part of Syntrix: text screens filled without a programmable block, operated like
+  Automatic LCDs 2 by MMaster (independent implementation, no code of it). Runs on the server, within a time
+  budget per tick; actions `SyxAutoLcd.ScrollUp`, `ScrollDown`, `Clear`, `Boot`; chat `/syxlcd`.
+- Other mods add commands as before through the events `SyxAutoLcd.RegisterCommand` and
+  `SyxAutoLcd.RegisterCommandTimed`; AutoLCD raises `SyxAutoLcd.Ready` when it starts. No dock file change.
+- Settings in the world storage of Syntrix (`Syntrix-AutoLcd.xml`, written with defaults by the server). Screen
+  texts come from `MyTexts_AutoLcd*.resx` of any loaded mod, with English fallbacks in the code.
+
+### NPC block category
+
+- New G menu category `NPC` (`Data/BlockCategories_Syntrix.sbc`, Name `SyxNpc`). In survival the game shows it to
+  admins only (`AvailableInSurvival` false). Mods add their NPC blocks under the same Name and repeat
+  `DisplayName` and `AvailableInSurvival`, because the first category of a Name that loads keeps its settings.
+- Admin only blocks: a block that the game reaches as a variant of another block (block variant group) stays
+  hidden in the G menu for admins too, so a group of admin only blocks shows as one entry.
+- Admin only blocks: on a player machine `Public` now follows the admin rank as well, so players without
+  admin rank no longer find the blocks in the G menu search. A dedicated server keeps `Public` on.
+- Admin only blocks: in survival they show only while creative tools are on (Alt+F10), as the game already does
+  for categories without researched blocks. In single player the game always gives rank Owner, so the rank
+  alone never hid them there.
+- Admin only blocks: the server no longer razes them when a player without admin rank builds one; the
+  notice arguments of `AdminBlockRegister` have no effect any more.
+
+## 1.4.1 (API version 5)
+
+No new endpoints; dock files stay valid.
+
+- F and K at blocks with the use object `SyntrixUse` stay closed for a player whose reputation with the block's
+  faction does not trade (goods level 0, see `RepDefineTiers` and `tradeFrom`). The player sees one notice
+  (`Syntrix_Rep_Refused`) instead. Members of the faction and blocks of factions without a reputation definition
+  are not affected. Mods with an F action need no code of their own for it.
+
 ## 1.4.0 (API version 5)
 
 Dock files of API versions 1 to 4 keep working; no endpoint was removed. Copy the new `Api/SyntrixApi.cs`

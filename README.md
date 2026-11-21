@@ -30,14 +30,20 @@ Copy the dock files into your mod's script folder and do not edit them:
 | Registration queue | network channels, block change handlers, chat commands, event subscriptions and settings may be registered right after `Load`; the dock file keeps them and hands them over when Syntrix is ready |
 | Helpers in the dock file | `SyntrixFiles` (world and local storage, never throws), `SyntrixText` (text lookup with fallback), `SyntrixLog` (log with mod prefix, optional own log file), `NotifyNear` (notification to the players near a place), `PlayersNear` and `PlayersIn` (players near a place or inside a box), drop-down lists whose entries depend on the block |
 | Windows (`SyntrixGui.cs`, players only) | windows in the Vanilla style through the game's own screen API (Esc, pause in single player, cursor, close button): panels and borders, stacks, scroll areas, text with wrapping, markup and links, buttons, images and icons (materials or definition ids), text fields, lists with icons and columns, trees, tables, check boxes, sliders, progress bars, tabs, drop-downs, tooltips, a confirmation window, a drawing area for special cases, and overlays on the screen without a window; grid size symbols of the G menu as materials `SyxGui_GridLarge` and `SyxGui_GridSmall` |
-| F action | a block gets its own F action (`UseRegister`) through the UseObjectsComponent `SyntrixUse` that Syntrix ships; without a registered action F opens the terminal; K still opens the Vanilla terminal |
+| F action | a block gets its own F action (`UseRegister`) through the UseObjectsComponent `SyntrixUse` that Syntrix ships; without a registered action F opens the terminal; K still opens the Vanilla terminal; both stay closed for players a faction with reputation rules does not trade with (1.4.1); a block without a registered action keeps its Vanilla use points (store, vending machine buttons), gated as well (1.5) |
 | Grid storage (server) | a grid group becomes a text (blueprint with block storage, relative to a frame, with its outline) and is spawned back after a space check, keeping the ids when they are free; plus the grid groups near a point (`GridsNearby`) |
 | Fixed screens (players) | a mod hands over lines for a block's screen; Syntrix draws them in one board style within 150 m, only on change, and takes the screen settings out of the K menu |
-| Admin only blocks | block types only admins see in the G menu; the server razes such blocks built by other players |
+| Admin only blocks | block types only admins with creative tools see in the G menu and its search; G menu category NPC |
 | Price requests | one mod gives prices for a service name, others ask with a description and get an amount or "no price" |
 | Block lights | the server sets colour, brightness and blinking of a block's status lights (emissive parts); Syntrix sends it to every player, also to later ones, and paints it again when the game repaints the block |
 | Short sounds | the server plays a short sound at a block or a place for the players within a radius |
 | Reputation | one faction mod defines scale, tiers with trade percent and goods level, start values, limits, links between factions and slow recovery; Syntrix gives the start values once, keeps every value in its limits (also against the game), passes shares on, sends the values to the player's machine, shows the change and raises `Syntrix.Rep.Changed`; `/syxrep` for admins |
+| Accounts (API 6) | player and faction money with one check per frame, `Syntrix.Account.Changed` for every change |
+| Reputation gate and price (API 6) | lowest goods level per block type or block (also Vanilla blocks such as stores), price after the player's trade percent |
+| World clock (API 6) | one world date and local time of day for all mods, settings in the world storage, planet calendars, event controller events, script properties, AutoLCD commands, `/syxtime` |
+| HUD values (API 6) | a shared table of values on the player's machine: mods write keys (`Hover.Target`), displays such as a HUD mod read them; Syntrix keeps the last value, so a display that docks later still sees everything, and raises `Syntrix.Hud` on change; the world clock writes its values there too |
+| Supply (API 6, server) | a mod watches a grid group with a profile: Syntrix keeps its reactors on and fuelled and its weapons loaded, out of nothing and without conveyors, from a slowly refilled stock; the stock lies in source blocks that another mod registers (an ammo store, then it is loot), otherwise Syntrix keeps it invisible and saves it with the world |
+| AutoLCD (1.5.0) | text screens filled without a programmable block, operated like Automatic LCDs 2 (inventory, cargo, power, blocks, gas, ship, text, time, reputation); mods add own commands through an event; settings in the world storage, `/syxlcd` |
 | Wiki | in-game wiki (F11, `/syxwiki`): every loaded mod adds pages with a `Data/Syntrix-Wiki.xml`, no code needed; mods with code add generated pages (`WikiAddSource`) and fill automatic tables (`WikiAddTables`) |
 
 ## Quick start
@@ -164,6 +170,42 @@ _syx.RepChange(identityId, "ABC", -300, "MyMod.BaseCore");
 // everywhere, also on the player's machine: value, tier, percent, goods level
 var info = _syx.RepInfo(identityId, "ABC");
 ```
+
+### Accounts, reputation gate, world clock (API 6)
+
+```csharp
+// all machines: Vanilla stores refuse players below goods level 1
+_syx.RepGateType("MyObjectBuilder_StoreBlock", 1);
+
+// server: charge the price after the player's trade percent
+long price = _syx.RepPrice(identityId, "ABC", 500, true);
+if (!_syx.AccountCharge(identityId, price, "MyMod.Repair"))
+    return;   // not enough money or player offline
+
+// everywhere: world date and the local time of day at a place
+string date = _syx.TimeWorldText();
+string local = _syx.TimeLocalText(position);
+_syx.Subscribe(SyntrixApi.TimeNewDayEvent, payload => OnNewDay());
+
+// player's machine: hand a value to the HUD, read one (clock values come from Syntrix itself)
+_syx.HudSet("MyMod.Speed", 12.5);
+double hour = _syx.HudNumber("Time.Local", -1);
+_syx.Subscribe(SyntrixApi.HudEvent, payload => { var kv = (MyTuple<string, object>)payload; });
+```
+
+### AutoLCD commands (1.5.0)
+
+A mod adds a command for screens with `[LCD]` in their name (server; again when AutoLCD reports ready):
+
+```csharp
+Func<IMyTerminalBlock, string[], List<MyTuple<string, string, float>>> lines = (screen, args) =>
+    new List<MyTuple<string, string, float>> { new MyTuple<string, string, float>("Stock", "42", 0.42f) };
+_syx.Publish("SyxAutoLcd.RegisterCommand", new MyTuple<string, Func<IMyTerminalBlock, string[], List<MyTuple<string, string, float>>>>("MyStock", lines));
+_syx.Subscribe("SyxAutoLcd.Ready", payload => { /* publish again */ });
+```
+
+Each line is label, value and bar fill 0 to 1 (negative: no bar); `SyxAutoLcd.RegisterCommandTimed` takes the seconds
+between two runs as a middle value. Details: `Data/Scripts/Syntrix/AutoLcd/README.md`.
 
 ### Rich HUD
 
