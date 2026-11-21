@@ -10,8 +10,10 @@ namespace Syntrix.Blocks
 {
     /// <summary>
     /// Blocks for admins only (API 4). A mod registers block types on every machine:
-    /// - G menu: every player machine shows the blocks only while the local player has admin rank (GuiVisible applies
-    ///   to the own machine only; Public stays on so that building does not fail because of it).
+    /// - G menu: every player machine shows the blocks only while the local player has admin rank. GuiVisible hides
+    ///   them in the categories, Public also in the G menu search; both apply to the own machine only. A machine
+    ///   without a player (dedicated server) keeps Public on, so admins can build. On a listen server the host's rank
+    ///   decides Public for the server part as well.
     /// - Server: a block of such a type that a player without admin rank starts to build or welds from a projection is
     ///   razed again, the player gets the mod's notice. Blocks placed finished (creative tools, prefabs, pasted grids)
     ///   and blocks of NPCs stay.
@@ -64,7 +66,7 @@ namespace Syntrix.Blocks
             if (_entries.TryGetValue(blockKey, out old) && old.Mod != mod)
                 Log.Warn("Admin block " + blockKey + " taken over by " + mod + " from " + old.Mod);
             bool variant = IsVariant(definition);
-            definition.Public = true;
+            definition.Public = !_core.IsPlayer || _visible;
             definition.GuiVisible = _core.IsPlayer && _visible && !variant;
             _entries[blockKey] = new Entry { Mod = mod, Notice = noticeKey, Fallback = fallback, Definition = definition, Variant = variant };
             if (_core.IsServer && !_watching)
@@ -81,6 +83,7 @@ namespace Syntrix.Blocks
             Entry old;
             if (!_entries.TryGetValue(blockKey, out old) || old.Mod != mod)
                 return;
+            old.Definition.Public = true;
             old.Definition.GuiVisible = !old.Variant;
             _entries.Remove(blockKey);
         }
@@ -101,7 +104,10 @@ namespace Syntrix.Blocks
         public void Stop()
         {
             foreach (var e in _entries.Values)
+            {
+                e.Definition.Public = true;
                 e.Definition.GuiVisible = !e.Variant;
+            }
             _entries.Clear();
             _raze.Clear();
         }
@@ -123,7 +129,10 @@ namespace Syntrix.Blocks
                 return;
             _visible = admin;
             foreach (var e in _entries.Values)
+            {
+                e.Definition.Public = admin;
                 e.Definition.GuiVisible = admin && !e.Variant;
+            }
         }
 
         private void Added(IMySlimBlock block)
