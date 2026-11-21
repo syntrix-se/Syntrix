@@ -20,8 +20,10 @@ to use accounts, the reputation gate and price, and the world clock.
   sells: higher).
 - `Rep.GateType` and `Rep.GateBlock` give block types or single blocks a lowest goods level; the gate of
   1.4.1 now also closes the terminal (K) at such blocks without the use object `SyntrixUse`. The F screen of a
-  Vanilla store is no terminal and no mod can close it, so a gated store takes the use object `SyntrixUse`:
-  F then opens the Vanilla store only for players whose goods level is high enough. `Rep.Refuses` and
+  Vanilla store is no terminal and no mod can close it, so a gated store takes the use object `SyntrixUse`.
+  A block with `SyntrixUse` and no registered F action keeps its Vanilla use points (store, the buttons of
+  vending machines, conveyor ports): Syntrix hands every action on to the game's own use object of that
+  detector, but only after the gate let the player through. `Rep.Refuses` and
   `Rep.MinGoods` ask for it.
 - Dock file: `RepPrice`, `RepRefuses`, `RepGateType`, `RepGateBlock`, `RepMinGoods`.
 

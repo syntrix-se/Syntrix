@@ -16,8 +16,10 @@ namespace Syntrix.Use
 {
     /// <summary>
     /// The game makes one per use point of a block whose UseObjectsComponent has UseObjectTypeOverride "syntrix".
-    /// F (Manipulate) runs the registered action, K (OpenTerminal) the Vanilla terminal. At a store block without a
-    /// registered action F opens the Vanilla store (1.5.0), so a store with this use object is gated by reputation too.
+    /// F (Manipulate) runs the registered action, K (OpenTerminal) the Vanilla terminal. A block without a registered
+    /// action keeps its Vanilla use points (store, vending machine buttons ...): Syntrix makes the Vanilla use object of
+    /// the same detector on the first use and hands every action on to it (1.5.0). So the reputation gate covers
+    /// screens that are no terminal, such as the Vanilla store.
     /// </summary>
     [MyUseObject("syntrix")]
     public class SyntrixUseObject : MyUseObjectBase
@@ -26,17 +28,26 @@ namespace Syntrix.Use
         private static readonly MyStringId TerminalHint = MyStringId.GetOrCompute("NotificationHintPressToOpenControlPanel");
         private static readonly MyStringId StoreHint = MyStringId.GetOrCompute("NotificationHintPressToOpenStore");
 
-        /// <summary>Vanilla store use objects made on demand, per store block (players only).</summary>
-        private static readonly Dictionary<long, IMyUseObject> _stores = new Dictionary<long, IMyUseObject>();
+        /// <summary>Vanilla detector name of the model dummy ("detector_store_1" gives "store"); null if none.</summary>
+        private readonly string _vanillaName;
+        private readonly Matrix _dummyMatrix;
+        private IMyUseObject _vanilla;
+        private bool _vanillaTried;
 
         /// <summary>Creates a use object for a model dummy of an entity.</summary>
         public SyntrixUseObject(IMyEntity owner, string dummyName, IMyModelDummy dummyData, uint shapeKey)
             : base(owner, dummyData)
         {
+            var parts = (dummyName ?? "").ToLowerInvariant().Split('_');
+            if (parts.Length >= 2 && parts[0] == "detector" && parts[1].Length > 0 && parts[1] != "syntrix")
+                _vanillaName = parts[1];
+            if (dummyData != null)
+                _dummyMatrix = dummyData.Matrix;
         }
 
         public override UseActionEnum PrimaryAction { get { return UseActionEnum.Manipulate; } }
         public override UseActionEnum SecondaryAction { get { return UseActionEnum.OpenTerminal; } }
+        public override UseActionEnum SupportedActions { get { return _vanilla != null ? _vanilla.SupportedActions | PrimaryAction | SecondaryAction : PrimaryAction | SecondaryAction; } }
 
         public override void Use(UseActionEnum action, IMyEntity user)
         {
@@ -51,37 +62,50 @@ namespace Syntrix.Use
             {
                 var service = UseService.Instance;
                 if (service != null && service.Has(block))
+                {
                     service.Use(block, 0);
-                else if (!(block is IMyStoreBlock) || !OpenStore(block, character))
-                    MyAPIGateway.Gui.ShowTerminalPage(MyTerminalPageEnum.ControlPanel, character, block);
+                    return;
+                }
             }
-            else if (action == UseActionEnum.OpenTerminal)
+            var vanilla = Vanilla();
+            if (vanilla != null)
+                vanilla.Use(action, user);
+            else if (action == UseActionEnum.Manipulate || action == UseActionEnum.OpenTerminal)
                 MyAPIGateway.Gui.ShowTerminalPage(MyTerminalPageEnum.ControlPanel, character, block);
         }
 
         /// <summary>
-        /// 1.5.0: opens the Vanilla store screen through the game's own "store" use object. The game makes it from the
-        /// detector name; it is taken out again at once, so it never becomes a second use point of the block.
+        /// 1.5.0: the game's own use object of this detector (store, vending machine button, terminal ...), made on the
+        /// first use without a registered action. The game makes it from the detector name; the detector is taken out
+        /// again at once, so it never becomes a second use point. Only from Use, never while the game walks the use points.
         /// </summary>
-        private static bool OpenStore(IMyEntity block, IMyCharacter character)
+        private IMyUseObject Vanilla()
         {
-            IMyUseObject store;
-            if (!_stores.TryGetValue(block.EntityId, out store) || store.Owner != block)
+            var service = UseService.Instance;
+            if (service != null && service.Has(Owner))
+                return null;
+            if (_vanillaTried)
+                return _vanilla;
+            _vanillaTried = true;
+            if (_vanillaName == null || Owner == null)
+                return null;
+            var uses = Owner.Components.Get<MyUseObjectsComponentBase>();
+            if (uses == null)
+                return null;
+            try
             {
-                var uses = block.Components.Get<MyUseObjectsComponentBase>();
-                if (uses == null)
-                    return false;
-                uint id = uses.AddDetector("store", Matrix.Identity);
-                store = uses.GetInteractiveObject(id);
+                uint id = uses.AddDetector(_vanillaName, _dummyMatrix);
+                _vanilla = uses.GetInteractiveObject(id);
                 uses.RemoveDetector(id);
-                if (store == null)
-                    return false;
-                if (_stores.Count > 200)
-                    _stores.Clear();
-                _stores[block.EntityId] = store;
             }
-            store.Use(UseActionEnum.Manipulate, character);
-            return true;
+            catch (Exception x)
+            {
+                Log.Error("Vanilla use object " + _vanillaName + " of " + UseService.KeyOf(Owner), x);
+                _vanilla = null;
+            }
+            if (_vanilla is SyntrixUseObject)
+                _vanilla = null;
+            return _vanilla;
         }
 
         /// <summary>1.4.1: a faction that does not trade with the player keeps F and K closed and says why.</summary>
@@ -97,6 +121,8 @@ namespace Syntrix.Use
 
         public override MyActionDescription GetActionInfo(UseActionEnum action)
         {
+            if (_vanilla != null && (UseService.Instance == null || !UseService.Instance.Has(Owner)))
+                return _vanilla.GetActionInfo(action);
             var d = new MyActionDescription();
             bool f = action == UseActionEnum.Manipulate;
             string hint = null;
