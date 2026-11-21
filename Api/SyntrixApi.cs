@@ -690,13 +690,13 @@ namespace Syntrix.Api
         // ---------- admin only blocks (API 4) ----------
 
         /// <summary>
-        /// API 4. A block type for admins only: in the G menu only while the local player is admin, and the server razes
-        /// such a block again when a player without admin rank starts to build it or welds it from a projection (blocks
-        /// placed finished, of NPCs or in prefabs stay). Call it on every machine; may be called before ready.
+        /// API 4. A block type for admins only: in the G menu and its search only while the local player is admin.
+        /// Call it on every machine; may be called before ready. Up to 1.4 the server also razed such a block built by a
+        /// player without admin rank; since 1.5 it does not.
         /// </summary>
         /// <param name="blockKey">"TypeId/SubtypeId" without "MyObjectBuilder_".</param>
-        /// <param name="noticeKey">Text key of the notice for that player, null = Syntrix default.</param>
-        /// <param name="fallback">Text if the key is missing.</param>
+        /// <param name="noticeKey">No effect since 1.5.</param>
+        /// <param name="fallback">No effect since 1.5.</param>
         public void AdminBlockRegister(string blockKey, string noticeKey, string fallback) { WhenReady(() => { if (_adminRegister != null) _adminRegister(blockKey, noticeKey, fallback); }); }
 
         /// <summary>API 4. Removes the admin rule of a block type (only the mod that registered it).</summary>

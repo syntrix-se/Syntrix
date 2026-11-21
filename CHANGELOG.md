@@ -92,6 +92,8 @@ to use accounts, the reputation gate and price, and the world clock.
   hidden in the G menu for admins too, so a group of admin only blocks shows as one entry.
 - Admin only blocks: on a player machine `Public` now follows the admin rank as well, so players without
   admin rank no longer find the blocks in the G menu search. A dedicated server keeps `Public` on.
+- Admin only blocks: the server no longer razes them when a player without admin rank builds one; the
+  notice arguments of `AdminBlockRegister` have no effect any more.
 
 ## 1.4.1 (API version 5)
 
