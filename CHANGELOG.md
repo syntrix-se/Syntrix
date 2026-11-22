@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.1 (API version 6)
+
+No new endpoints; dock files stay valid.
+
+- Terminal (K) of programmable blocks no longer empty for players joining a server. AutoLCD and the world clock
+  asked for or added programmable block controls before the game had made them (the player's grids arrive later),
+  which left the terminal of every programmable block without any control. Both now wait for the first
+  programmable block on the machine and act right when it appears.
+
 ## 1.5.0 (API version 6)
 
 Dock files of API versions 1 to 5 keep working; no endpoint was removed. Copy the new `Api/SyntrixApi.cs`

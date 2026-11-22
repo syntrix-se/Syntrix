@@ -70,10 +70,13 @@ namespace Syntrix.AutoLcd
             _statusAsked.Clear();
         }
 
-        /// <summary>Looks for the actions of programmable blocks until they are wrapped (needed on servers).</summary>
+        /// <summary>
+        /// Looks for the actions of programmable blocks until they are wrapped (needed on servers). Only once a
+        /// programmable block exists: asking earlier leaves the terminal of all programmable blocks empty.
+        /// </summary>
         public static void Update()
         {
-            if (_runWrapped && _defaultWrapped)
+            if ((_runWrapped && _defaultWrapped) || !Syntrix.Time.TimeProgrammableBlock.Present)
                 return;
             double now = AutoLcdCore.Now;
             if (now < _nextLookup)
