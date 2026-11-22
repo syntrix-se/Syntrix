@@ -143,6 +143,7 @@ namespace Syntrix
             Time.Start();
             Chat.Register("Syntrix", "syxrep", (int)MyPromoteLevel.Admin, true, "reputation of players (/syxrep list|set|add|reset)", Rep.OnChat);
             Started = true;
+            Syntrix.Time.TimeControls.EnsureProgrammable();   // a programmable block may have come first
 
             Log.Info("Syntrix " + Protocol.VersionText + " (API " + Protocol.ApiVersion + ") started, " + (IsServer ? "server" : "client") + (IsPlayer ? " with player" : ""));
             MyAPIGateway.Utilities.SendModMessage(Protocol.ApiChannel, new MyTuple<string, int>(Protocol.TagHello, Protocol.ApiVersion));

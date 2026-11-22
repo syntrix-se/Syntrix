@@ -53,7 +53,7 @@ namespace Syntrix.Time
                     _block.Components.Add(new TimeOfDayEvent());
                 if (!_block.Components.Has<DayNightEvent>())
                     _block.Components.Add(new DayNightEvent());
-                TimeControls.Ensure();
+                TimeControls.EnsureEventController();
                 _server = MyAPIGateway.Session.IsServer;
                 if (_server)
                     NeedsUpdate |= MyEntityUpdateEnum.EACH_100TH_FRAME;
@@ -182,39 +182,51 @@ namespace Syntrix.Time
     ///   string world = Me.GetProperty("Syx.WorldTime").As&lt;string&gt;().GetValue(Me);
     ///   float "Syx.WorldYear", "Syx.WorldDay", "Syx.WorldHour"; string "Syx.Calendar" (name and date, empty without one).
     /// Made with the first programmable block on every machine, also on dedicated servers where the scripts run.
+    /// The game makes the vanilla controls of a block type with its first block. Asking for them or adding own ones
+    /// earlier leaves the terminal of every block of that type empty (seen on players joining a server, whose grids
+    /// arrive later), so everything touching the controls of programmable blocks waits for <see cref="Present"/>.
     /// </summary>
     [MyEntityComponentDescriptor(typeof(MyObjectBuilder_MyProgrammableBlock), false)]
     public class TimeProgrammableBlock : MyGameLogicComponent
     {
+        /// <summary>True once a programmable block exists on this machine (its vanilla controls are made).</summary>
+        public static bool Present { get; private set; }
+
         /// <summary>Waits one frame (the vanilla controls must exist first).</summary>
         public override void Init(MyObjectBuilder_EntityBase objectBuilder)
         {
-            if (!TimeControls.Done)
+            if (!Present || !TimeControls.ProgramDone)
                 NeedsUpdate |= MyEntityUpdateEnum.BEFORE_NEXT_FRAME;
         }
 
-        /// <summary>Makes the controls once.</summary>
+        /// <summary>Marks programmable blocks as present and makes the properties once.</summary>
         public override void UpdateOnceBeforeFrame()
         {
-            try { TimeControls.Ensure(); }
+            Present = true;
+            try { TimeControls.EnsureProgrammable(); }
             catch (Exception e) { Log.Error("time properties", e); }
         }
+
+        /// <summary>End of session.</summary>
+        internal static void Reset() { Present = false; }
     }
 
     /// <summary>Terminal controls and properties of the time service, made once per session.</summary>
     public static class TimeControls
     {
-        /// <summary>True once made.</summary>
-        public static bool Done { get; private set; }
+        /// <summary>True once the slider of the event controller is made.</summary>
+        public static bool EventDone { get; private set; }
+        /// <summary>True once the properties of the programmable block are made.</summary>
+        public static bool ProgramDone { get; private set; }
 
         private static readonly List<IMyTerminalControl> _made = new List<IMyTerminalControl>();
 
-        /// <summary>Makes the slider of the event controller and the properties of the programmable block.</summary>
-        public static void Ensure()
+        /// <summary>Makes the slider of the event controller (called by an event controller, so its controls exist).</summary>
+        public static void EnsureEventController()
         {
-            if (Done || !TimeEventLogic.Running)
+            if (EventDone || !TimeEventLogic.Running)
                 return;
-            Done = true;
+            EventDone = true;
             var tc = MyAPIGateway.TerminalControls;
 
             var slider = tc.CreateControl<IMyTerminalControlSlider, IMyEventControllerBlock>("Syntrix_TimeOfDay");
@@ -232,7 +244,14 @@ namespace Syntrix.Time
             slider.SupportsMultipleBlocks = true;
             tc.AddControl<IMyEventControllerBlock>(slider);
             _made.Add(slider);
+        }
 
+        /// <summary>Makes the properties of the programmable block (only once one exists, see <see cref="TimeProgrammableBlock"/>).</summary>
+        public static void EnsureProgrammable()
+        {
+            if (ProgramDone || !TimeProgrammableBlock.Present || !TimeEventLogic.Running)
+                return;
+            ProgramDone = true;
             Property("Syx.LocalTime", b => { var t = Time.Local(b.GetPosition()); return t.Item1 ? (float)t.Item2 : -1f; });
             Property("Syx.Night", b => Time.IsNight(b.GetPosition()));
             Property("Syx.SunHeight", b => Time.Local(b.GetPosition()).Item3);
@@ -246,9 +265,10 @@ namespace Syntrix.Time
         /// <summary>Removes the controls (end of session).</summary>
         public static void Unload()
         {
-            if (!Done)
+            TimeProgrammableBlock.Reset();
+            if (!EventDone && !ProgramDone)
                 return;
-            Done = false;
+            EventDone = ProgramDone = false;
             var tc = MyAPIGateway.TerminalControls;
             foreach (var c in _made)
             {

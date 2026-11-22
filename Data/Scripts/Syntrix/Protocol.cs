@@ -19,7 +19,7 @@ namespace Syntrix
         public const int MinApiVersion = 1;
 
         /// <summary>Human readable version (semantic versioning).</summary>
-        public const string VersionText = "1.5.0";
+        public const string VersionText = "1.5.1";
 
         /// <summary>Message tag: a mod asks to dock.</summary>
         public const string TagRegister = "syx.register";
